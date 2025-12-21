@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { query, queryOne } from "@/lib/db";
 import { generateRoomCode } from "@/lib/utils";
 import { buildDeckFromFilters, buildDeckFromTitles } from "@/lib/services/movies";
 import { parseMovieListUrl, parseTextList } from "@/lib/parsers";
@@ -69,44 +69,37 @@ export async function POST(request: NextRequest) {
     }
 
     const deck = movies.map((m) => m.tmdbId);
-    const supabase = await createClient();
 
     // Generate unique room code
     let code: string = "";
     let codeExists = true;
     while (codeExists) {
       code = generateRoomCode();
-      const { data } = await supabase
-        .from("sessions")
-        .select("id")
-        .eq("code", code)
-        .single();
-      codeExists = !!data;
+      const existing = await queryOne(
+        "SELECT id FROM sessions WHERE code = $1",
+        [code]
+      );
+      codeExists = !!existing;
     }
 
     // Create session
-    const { data: newSession, error } = await supabase
-      .from("sessions")
-      .insert({
-        code,
-        host_id: session.user.id,
-        deck,
-        status: "lobby",
-      })
-      .select()
-      .single();
+    const newSession = await queryOne<{ id: string; code: string }>(
+      `INSERT INTO sessions (code, host_id, deck, status)
+       VALUES ($1, $2, $3, 'lobby')
+       RETURNING id, code`,
+      [code, session.user.id, deck]
+    );
 
-    if (error) {
-      console.error("Error creating session:", error);
+    if (!newSession) {
       return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
     }
 
     // Add host as participant
-    await supabase.from("session_participants").insert({
-      session_id: newSession.id,
-      user_id: session.user.id,
-      nickname: session.user.name || "Host",
-    });
+    await query(
+      `INSERT INTO session_participants (session_id, user_id, nickname)
+       VALUES ($1, $2, $3)`,
+      [newSession.id, session.user.id, session.user.name || "Host"]
+    );
 
     return NextResponse.json({
       id: newSession.id,

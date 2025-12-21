@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { query, queryOne } from "@/lib/db";
 
 // PATCH - Accept friend request
 export async function PATCH(
@@ -15,32 +15,30 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const supabase = await createClient();
 
-  // Verify this request is for the current user
-  const { data: friendship } = await supabase
-    .from("friendships")
-    .select("*")
-    .eq("id", id)
-    .eq("friend_id", session.user.id)
-    .eq("status", "pending")
-    .single();
+  try {
+    // Verify this request is for the current user
+    const friendship = await queryOne<{ id: string }>(
+      `SELECT id FROM friendships
+       WHERE id = $1 AND friend_id = $2 AND status = 'pending'`,
+      [id, session.user.id]
+    );
 
-  if (!friendship) {
-    return NextResponse.json({ error: "Request not found" }, { status: 404 });
-  }
+    if (!friendship) {
+      return NextResponse.json({ error: "Request not found" }, { status: 404 });
+    }
 
-  // Accept the request
-  const { error } = await supabase
-    .from("friendships")
-    .update({ status: "accepted" })
-    .eq("id", id);
+    // Accept the request
+    await query(
+      "UPDATE friendships SET status = 'accepted' WHERE id = $1",
+      [id]
+    );
 
-  if (error) {
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error accepting friend request:", error);
     return NextResponse.json({ error: "Failed to accept" }, { status: 500 });
   }
-
-  return NextResponse.json({ success: true });
 }
 
 // DELETE - Reject request or remove friend
@@ -55,18 +53,18 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const supabase = await createClient();
 
-  // Delete the friendship (works for both pending and accepted)
-  const { error } = await supabase
-    .from("friendships")
-    .delete()
-    .eq("id", id)
-    .or(`user_id.eq.${session.user.id},friend_id.eq.${session.user.id}`);
+  try {
+    // Delete the friendship (works for both pending and accepted)
+    await query(
+      `DELETE FROM friendships
+       WHERE id = $1 AND (user_id = $2 OR friend_id = $2)`,
+      [id, session.user.id]
+    );
 
-  if (error) {
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error removing friend:", error);
     return NextResponse.json({ error: "Failed to remove" }, { status: 500 });
   }
-
-  return NextResponse.json({ success: true });
 }

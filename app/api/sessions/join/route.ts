@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { query, queryOne } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -16,51 +16,44 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Room code required" }, { status: 400 });
   }
 
-  const supabase = await createClient();
-
-  // Find session by code
-  const { data: sessionData, error } = await supabase
-    .from("sessions")
-    .select("id, status")
-    .eq("code", code.toUpperCase())
-    .single();
-
-  if (error || !sessionData) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  }
-
-  if (sessionData.status !== "lobby") {
-    return NextResponse.json(
-      { error: "Session already started" },
-      { status: 400 }
+  try {
+    // Find session by code
+    const sessionData = await queryOne<{ id: string; status: string }>(
+      "SELECT id, status FROM sessions WHERE code = $1",
+      [code.toUpperCase()]
     );
-  }
 
-  // Check if already participant
-  const { data: existing } = await supabase
-    .from("session_participants")
-    .select("id")
-    .eq("session_id", sessionData.id)
-    .eq("user_id", session.user.id)
-    .single();
+    if (!sessionData) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
 
-  if (existing) {
+    if (sessionData.status !== "lobby") {
+      return NextResponse.json(
+        { error: "Session already started" },
+        { status: 400 }
+      );
+    }
+
+    // Check if already participant
+    const existing = await queryOne<{ id: string }>(
+      "SELECT id FROM session_participants WHERE session_id = $1 AND user_id = $2",
+      [sessionData.id, session.user.id]
+    );
+
+    if (existing) {
+      return NextResponse.json({ sessionId: sessionData.id });
+    }
+
+    // Add as participant
+    await query(
+      `INSERT INTO session_participants (session_id, user_id, nickname)
+       VALUES ($1, $2, $3)`,
+      [sessionData.id, session.user.id, session.user.name || "Guest"]
+    );
+
     return NextResponse.json({ sessionId: sessionData.id });
-  }
-
-  // Add as participant
-  const { error: joinError } = await supabase
-    .from("session_participants")
-    .insert({
-      session_id: sessionData.id,
-      user_id: session.user.id,
-      nickname: session.user.name || "Guest",
-    });
-
-  if (joinError) {
-    console.error("Error joining session:", joinError);
+  } catch (error) {
+    console.error("Error joining session:", error);
     return NextResponse.json({ error: "Failed to join" }, { status: 500 });
   }
-
-  return NextResponse.json({ sessionId: sessionData.id });
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { query, queryMany } from "@/lib/db";
 
 export async function POST(
   request: NextRequest,
@@ -20,31 +20,29 @@ export async function POST(
     return NextResponse.json({ error: "Invalid movie ID" }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  try {
+    // Get participants
+    const participants = await queryMany<{ user_id: string }>(
+      "SELECT user_id FROM session_participants WHERE session_id = $1",
+      [id]
+    );
 
-  // Get participants
-  const { data: participants } = await supabase
-    .from("session_participants")
-    .select("user_id")
-    .eq("session_id", id);
+    if (participants.length === 0) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
 
-  if (!participants) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  }
+    const watchedBy = participants.map((p) => p.user_id);
 
-  const watchedBy = participants.map((p) => p.user_id);
+    // Record watched movie
+    await query(
+      `INSERT INTO watched_movies (session_id, movie_id, watched_by)
+       VALUES ($1, $2, $3)`,
+      [id, movieId, watchedBy]
+    );
 
-  // Record watched movie
-  const { error } = await supabase.from("watched_movies").insert({
-    session_id: id,
-    movie_id: movieId,
-    watched_by: watchedBy,
-  });
-
-  if (error) {
+    return NextResponse.json({ success: true });
+  } catch (error) {
     console.error("Error recording watched movie:", error);
     return NextResponse.json({ error: "Failed to record" }, { status: 500 });
   }
-
-  return NextResponse.json({ success: true });
 }

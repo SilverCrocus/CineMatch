@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { query, queryOne } from "@/lib/db";
 import {
   discoverMovies,
   getMovieDetails,
@@ -9,14 +9,31 @@ import {
   getYear,
   searchMovies,
 } from "@/lib/api/tmdb";
-import { getOMDbRatings, searchOMDb } from "@/lib/api/omdb";
-import type { Movie, CachedMovie } from "@/types";
+import { getOMDbRatings } from "@/lib/api/omdb";
+import type { Movie } from "@/types";
 
 interface MovieFilters {
   genres?: number[];
   yearFrom?: number;
   yearTo?: number;
   limit?: number;
+}
+
+interface CachedMovieRow {
+  id: string;
+  tmdb_id: number;
+  imdb_id: string | null;
+  title: string;
+  year: number;
+  poster_url: string | null;
+  backdrop_url: string | null;
+  genres: string[];
+  synopsis: string;
+  runtime: number | null;
+  imdb_rating: string | null;
+  rt_critic_score: string | null;
+  streaming_services: string[];
+  cached_at: string;
 }
 
 async function enrichMovieWithRatings(
@@ -66,14 +83,11 @@ async function tmdbToMovie(tmdbId: number): Promise<Movie | null> {
 }
 
 export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
-  const supabase = await createClient();
-
   // Check cache first
-  const { data: cached } = await supabase
-    .from("cached_movies")
-    .select("*")
-    .eq("tmdb_id", tmdbId)
-    .single();
+  const cached = await queryOne<CachedMovieRow>(
+    "SELECT * FROM cached_movies WHERE tmdb_id = $1",
+    [tmdbId]
+  );
 
   if (cached) {
     // Check if cache is still valid (24 hours)
@@ -105,38 +119,25 @@ export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
   if (!movie) return null;
 
   // Cache the result
-  const cacheData: Omit<CachedMovie, "id" | "cachedAt"> = {
-    tmdbId: movie.tmdbId,
-    imdbId: movie.imdbId,
-    title: movie.title,
-    year: movie.year,
-    posterUrl: movie.posterUrl,
-    backdropUrl: movie.backdropUrl,
-    genres: movie.genres,
-    synopsis: movie.synopsis,
-    runtime: movie.runtime,
-    imdbRating: movie.imdbRating,
-    rtCriticScore: movie.rtCriticScore,
-    streamingServices: movie.streamingServices,
-  };
-
-  await supabase.from("cached_movies").upsert(
-    {
-      tmdb_id: cacheData.tmdbId,
-      imdb_id: cacheData.imdbId,
-      title: cacheData.title,
-      year: cacheData.year,
-      poster_url: cacheData.posterUrl,
-      backdrop_url: cacheData.backdropUrl,
-      genres: cacheData.genres,
-      synopsis: cacheData.synopsis,
-      runtime: cacheData.runtime,
-      imdb_rating: cacheData.imdbRating,
-      rt_critic_score: cacheData.rtCriticScore,
-      streaming_services: cacheData.streamingServices,
-      cached_at: new Date().toISOString(),
-    },
-    { onConflict: "tmdb_id" }
+  await query(
+    `INSERT INTO cached_movies (tmdb_id, imdb_id, title, year, poster_url, backdrop_url, genres, synopsis, runtime, imdb_rating, rt_critic_score, streaming_services, cached_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+     ON CONFLICT (tmdb_id)
+     DO UPDATE SET imdb_id = $2, title = $3, year = $4, poster_url = $5, backdrop_url = $6, genres = $7, synopsis = $8, runtime = $9, imdb_rating = $10, rt_critic_score = $11, streaming_services = $12, cached_at = NOW()`,
+    [
+      movie.tmdbId,
+      movie.imdbId,
+      movie.title,
+      movie.year,
+      movie.posterUrl,
+      movie.backdropUrl,
+      movie.genres,
+      movie.synopsis,
+      movie.runtime,
+      movie.imdbRating,
+      movie.rtCriticScore,
+      movie.streamingServices,
+    ]
   );
 
   return movie;
@@ -216,8 +217,8 @@ export async function getMoviesByIds(tmdbIds: number[]): Promise<Movie[]> {
   return movies.filter((m): m is Movie => m !== null);
 }
 
-export async function searchMoviesByTitle(query: string): Promise<Movie[]> {
-  const results = await searchMovies(query);
+export async function searchMoviesByTitle(searchQuery: string): Promise<Movie[]> {
+  const results = await searchMovies(searchQuery);
 
   // Only return basic info for search results (no full enrichment)
   return results.slice(0, 10).map((m) => ({

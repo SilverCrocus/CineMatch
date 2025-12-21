@@ -1,3 +1,6 @@
+-- PostgreSQL Schema for Cinematch
+-- Run this on your Render PostgreSQL database
+
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -22,7 +25,7 @@ CREATE TABLE friendships (
 
 -- Cached movies from TMDB/OMDb
 CREATE TABLE cached_movies (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tmdb_id INTEGER UNIQUE NOT NULL,
   imdb_id VARCHAR(20),
   title VARCHAR(500) NOT NULL,
@@ -32,10 +35,10 @@ CREATE TABLE cached_movies (
   genres TEXT[] DEFAULT '{}',
   synopsis TEXT,
   runtime INTEGER,
-  tmdb_rating DECIMAL(3,1),
   imdb_rating VARCHAR(10),
+  rt_critic_score VARCHAR(10),
   streaming_services TEXT[] DEFAULT '{}',
-  fetched_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  cached_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Sessions

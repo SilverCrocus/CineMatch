@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { query, queryOne, queryMany } from "@/lib/db";
 import { getMoviesByIds } from "@/lib/services/movies";
+
+interface SwipeRow {
+  movie_id: number;
+  user_id: string;
+  liked: boolean;
+}
 
 export async function POST(
   request: NextRequest,
@@ -15,15 +21,19 @@ export async function POST(
   }
 
   const { id } = await params;
-  const supabase = await createClient();
 
-  // Update session status
-  await supabase
-    .from("sessions")
-    .update({ status: "revealed" })
-    .eq("id", id);
+  try {
+    // Update session status
+    await query(
+      "UPDATE sessions SET status = 'revealed' WHERE id = $1",
+      [id]
+    );
 
-  return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error revealing results:", error);
+    return NextResponse.json({ error: "Failed to reveal" }, { status: 500 });
+  }
 }
 
 export async function GET(
@@ -37,56 +47,60 @@ export async function GET(
   }
 
   const { id } = await params;
-  const supabase = await createClient();
 
-  // Get session and participants
-  const { data: sessionData } = await supabase
-    .from("sessions")
-    .select(`
-      deck,
-      session_participants (user_id)
-    `)
-    .eq("id", id)
-    .single();
+  try {
+    // Get session deck
+    const sessionData = await queryOne<{ deck: number[] }>(
+      "SELECT deck FROM sessions WHERE id = $1",
+      [id]
+    );
 
-  if (!sessionData) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  }
+    if (!sessionData) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
 
-  const participantIds = sessionData.session_participants.map(
-    (p: { user_id: string }) => p.user_id
-  );
+    // Get participants
+    const participants = await queryMany<{ user_id: string }>(
+      "SELECT user_id FROM session_participants WHERE session_id = $1",
+      [id]
+    );
 
-  // Get all swipes for this session
-  const { data: allSwipes } = await supabase
-    .from("swipes")
-    .select("movie_id, user_id, liked")
-    .eq("session_id", id);
+    const participantIds = participants.map((p) => p.user_id);
 
-  if (!allSwipes) {
-    return NextResponse.json({ matches: [] });
-  }
+    // Get all swipes for this session
+    const allSwipes = await queryMany<SwipeRow>(
+      "SELECT movie_id, user_id, liked FROM swipes WHERE session_id = $1",
+      [id]
+    );
 
-  // Find movies everyone liked
-  const movieLikes = new Map<number, Set<string>>();
-  for (const swipe of allSwipes) {
-    if (swipe.liked) {
-      if (!movieLikes.has(swipe.movie_id)) {
-        movieLikes.set(swipe.movie_id, new Set());
+    if (allSwipes.length === 0) {
+      return NextResponse.json({ matches: [] });
+    }
+
+    // Find movies everyone liked
+    const movieLikes = new Map<number, Set<string>>();
+    for (const swipe of allSwipes) {
+      if (swipe.liked) {
+        if (!movieLikes.has(swipe.movie_id)) {
+          movieLikes.set(swipe.movie_id, new Set());
+        }
+        movieLikes.get(swipe.movie_id)!.add(swipe.user_id);
       }
-      movieLikes.get(swipe.movie_id)!.add(swipe.user_id);
     }
-  }
 
-  const matchedIds: number[] = [];
-  for (const [movieId, likers] of movieLikes) {
-    if (participantIds.every((pid: string) => likers.has(pid))) {
-      matchedIds.push(movieId);
+    const matchedIds: number[] = [];
+    for (const [movieId, likers] of movieLikes) {
+      if (participantIds.every((pid) => likers.has(pid))) {
+        matchedIds.push(movieId);
+      }
     }
+
+    // Get movie details for matches
+    const matches = await getMoviesByIds(matchedIds);
+
+    return NextResponse.json({ matches });
+  } catch (error) {
+    console.error("Error getting matches:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  // Get movie details for matches
-  const matches = await getMoviesByIds(matchedIds);
-
-  return NextResponse.json({ matches });
 }

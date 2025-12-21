@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { query, queryOne } from "@/lib/db";
 
 export async function POST(
   request: NextRequest,
@@ -14,36 +14,35 @@ export async function POST(
   }
 
   const { id } = await params;
-  const supabase = await createClient();
 
-  // Verify user is host
-  const { data: sessionData } = await supabase
-    .from("sessions")
-    .select("host_id, status")
-    .eq("id", id)
-    .single();
+  try {
+    // Verify user is host
+    const sessionData = await queryOne<{ host_id: string; status: string }>(
+      "SELECT host_id, status FROM sessions WHERE id = $1",
+      [id]
+    );
 
-  if (!sessionData) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  }
+    if (!sessionData) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
 
-  if (sessionData.host_id !== session.user.id) {
-    return NextResponse.json({ error: "Only host can start" }, { status: 403 });
-  }
+    if (sessionData.host_id !== session.user.id) {
+      return NextResponse.json({ error: "Only host can start" }, { status: 403 });
+    }
 
-  if (sessionData.status !== "lobby") {
-    return NextResponse.json({ error: "Session already started" }, { status: 400 });
-  }
+    if (sessionData.status !== "lobby") {
+      return NextResponse.json({ error: "Session already started" }, { status: 400 });
+    }
 
-  // Update status to swiping
-  const { error } = await supabase
-    .from("sessions")
-    .update({ status: "swiping" })
-    .eq("id", id);
+    // Update status to swiping
+    await query(
+      "UPDATE sessions SET status = 'swiping' WHERE id = $1",
+      [id]
+    );
 
-  if (error) {
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error starting session:", error);
     return NextResponse.json({ error: "Failed to start" }, { status: 500 });
   }
-
-  return NextResponse.json({ success: true });
 }

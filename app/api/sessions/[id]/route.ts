@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { queryOne, queryMany } from "@/lib/db";
 import { getMoviesByIds } from "@/lib/services/movies";
+
+interface SessionRow {
+  id: string;
+  code: string;
+  status: string;
+  host_id: string;
+  deck: number[];
+}
+
+interface ParticipantRow {
+  id: string;
+  user_id: string;
+  nickname: string;
+  completed: boolean;
+  user_name: string | null;
+  user_image: string | null;
+}
+
+interface SwipeRow {
+  movie_id: number;
+  liked: boolean;
+}
 
 export async function GET(
   request: NextRequest,
@@ -15,74 +37,75 @@ export async function GET(
   }
 
   const { id } = await params;
-  const supabase = await createClient();
 
-  // Get session with participants
-  const { data: sessionData, error } = await supabase
-    .from("sessions")
-    .select(`
-      *,
-      session_participants (
-        id,
-        user_id,
-        nickname,
-        completed,
-        users (
-          id,
-          name,
-          image
-        )
-      )
-    `)
-    .eq("id", id)
-    .single();
+  try {
+    // Get session
+    const sessionData = await queryOne<SessionRow>(
+      "SELECT id, code, status, host_id, deck FROM sessions WHERE id = $1",
+      [id]
+    );
 
-  if (error || !sessionData) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  }
+    if (!sessionData) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
 
-  // Check if user is participant
-  const isParticipant = sessionData.session_participants.some(
-    (p: { user_id: string }) => p.user_id === session.user.id
-  );
+    // Get participants with user info
+    const participants = await queryMany<ParticipantRow>(
+      `SELECT sp.id, sp.user_id, sp.nickname, sp.completed,
+              u.name as user_name, u.image as user_image
+       FROM session_participants sp
+       LEFT JOIN users u ON sp.user_id = u.id
+       WHERE sp.session_id = $1`,
+      [id]
+    );
 
-  if (!isParticipant) {
-    return NextResponse.json({ error: "Not a participant" }, { status: 403 });
-  }
+    // Check if user is participant
+    const isParticipant = participants.some(
+      (p) => p.user_id === session.user.id
+    );
 
-  // Get movies for the deck
-  const movies = await getMoviesByIds(sessionData.deck);
+    if (!isParticipant) {
+      return NextResponse.json({ error: "Not a participant" }, { status: 403 });
+    }
 
-  // Get user's swipes if swiping
-  let userSwipes: Record<number, boolean> = {};
-  if (sessionData.status !== "lobby") {
-    const { data: swipes } = await supabase
-      .from("swipes")
-      .select("movie_id, liked")
-      .eq("session_id", id)
-      .eq("user_id", session.user.id);
+    // Get movies for the deck
+    const movies = await getMoviesByIds(sessionData.deck);
 
-    if (swipes) {
+    // Get user's swipes if swiping
+    let userSwipes: Record<number, boolean> = {};
+    if (sessionData.status !== "lobby") {
+      const swipes = await queryMany<SwipeRow>(
+        "SELECT movie_id, liked FROM swipes WHERE session_id = $1 AND user_id = $2",
+        [id, session.user.id]
+      );
+
       userSwipes = Object.fromEntries(
         swipes.map((s) => [s.movie_id, s.liked])
       );
     }
-  }
 
-  return NextResponse.json({
-    id: sessionData.id,
-    code: sessionData.code,
-    status: sessionData.status,
-    hostId: sessionData.host_id,
-    participants: sessionData.session_participants.map((p: any) => ({
-      id: p.id,
-      userId: p.user_id,
-      nickname: p.nickname,
-      completed: p.completed,
-      user: p.users,
-    })),
-    movies,
-    userSwipes,
-    isHost: sessionData.host_id === session.user.id,
-  });
+    return NextResponse.json({
+      id: sessionData.id,
+      code: sessionData.code,
+      status: sessionData.status,
+      hostId: sessionData.host_id,
+      participants: participants.map((p) => ({
+        id: p.id,
+        userId: p.user_id,
+        nickname: p.nickname,
+        completed: p.completed,
+        user: p.user_name ? {
+          id: p.user_id,
+          name: p.user_name,
+          image: p.user_image,
+        } : null,
+      })),
+      movies,
+      userSwipes,
+      isHost: sessionData.host_id === session.user.id,
+    });
+  } catch (error) {
+    console.error("Error fetching session:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

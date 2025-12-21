@@ -1,6 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { createClient } from "@/lib/supabase/server";
+import { query, queryOne } from "@/lib/db";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -12,25 +12,16 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === "google") {
-        const supabase = await createClient();
-
-        // Upsert user in our database
-        const { error } = await supabase
-          .from("users")
-          .upsert(
-            {
-              email: user.email!,
-              name: user.name,
-              image: user.image,
-            },
-            {
-              onConflict: "email",
-            }
-          )
-          .select()
-          .single();
-
-        if (error) {
+        try {
+          // Upsert user in our database
+          await query(
+            `INSERT INTO users (email, name, image)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (email)
+             DO UPDATE SET name = $2, image = $3`,
+            [user.email, user.name, user.image]
+          );
+        } catch (error) {
           console.error("Error upserting user:", error);
           return false;
         }
@@ -39,12 +30,10 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session }) {
       if (session.user?.email) {
-        const supabase = await createClient();
-        const { data: dbUser } = await supabase
-          .from("users")
-          .select("id")
-          .eq("email", session.user.email)
-          .single();
+        const dbUser = await queryOne<{ id: string }>(
+          "SELECT id FROM users WHERE email = $1",
+          [session.user.email]
+        );
 
         if (dbUser) {
           session.user.id = dbUser.id;
