@@ -83,14 +83,21 @@ export default function SessionPage() {
   };
 
   const handleComplete = async () => {
-    // Fetch matches
+    // User finished swiping - just refresh to update completed status
+    fetchSession();
+  };
+
+  const revealMatches = useCallback(async () => {
+    // First update status to revealed
+    await fetch(`/api/sessions/${params.id}/reveal`, { method: "POST" });
+    // Then fetch matches
     const res = await fetch(`/api/sessions/${params.id}/reveal`);
     if (res.ok) {
       const data = await res.json();
       setMatches(data.matches);
     }
     fetchSession();
-  };
+  }, [params.id, fetchSession]);
 
   const selectMovie = async (movieId: number) => {
     await fetch(`/api/sessions/${params.id}/select`, {
@@ -100,6 +107,20 @@ export default function SessionPage() {
     });
     setSelectedMovie(movieId);
   };
+
+  // Calculate completion status (must be before early returns for hooks rules)
+  const userParticipant = session?.participants.find(
+    (p) => p.user?.id === authSession?.user?.id
+  );
+  const isCompleted = userParticipant?.completed ?? false;
+  const allCompleted = session?.participants.every((p) => p.completed) ?? false;
+
+  // Auto-reveal when everyone is done
+  useEffect(() => {
+    if (session?.status === "swiping" && allCompleted && isCompleted) {
+      revealMatches();
+    }
+  }, [session?.status, allCompleted, isCompleted, revealMatches]);
 
   if (loading) {
     return (
@@ -188,24 +209,13 @@ export default function SessionPage() {
 
   // SWIPING VIEW
   if (session.status === "swiping") {
-    const userParticipant = session.participants.find(
-      (p) => p.user?.id === authSession?.user?.id
-    );
-    const isCompleted = userParticipant?.completed;
-
     if (isCompleted) {
-      // Check if everyone is done
-      const allCompleted = session.participants.every((p) => p.completed);
-
-      if (allCompleted) {
-        // Trigger reveal
-        handleComplete();
-      }
-
       return (
         <main className="min-h-screen flex flex-col items-center justify-center p-4">
           <h2 className="text-2xl font-bold mb-4">All done!</h2>
-          <p className="text-muted-foreground mb-8">Waiting for others...</p>
+          <p className="text-muted-foreground mb-8">
+            {allCompleted ? "Revealing matches..." : "Waiting for others..."}
+          </p>
           <div className="space-y-2">
             {session.participants.map((p) => (
               <div key={p.id} className="flex items-center gap-3">
