@@ -7,8 +7,9 @@ export interface User {
 }
 
 export interface Movie {
-  id: number;
+  id: string;
   tmdbId: number;
+  imdbId: string | null;
   title: string;
   year: number;
   posterUrl: string | null;
@@ -16,10 +17,26 @@ export interface Movie {
   genres: string[];
   synopsis: string;
   runtime: number | null;
-  tmdbRating: number | null;
   imdbRating: string | null;
-  imdbId: string | null;
+  rtCriticScore: string | null;
   streamingServices: string[];
+}
+
+export interface CachedMovie {
+  id?: string;
+  tmdbId: number;
+  imdbId: string | null;
+  title: string;
+  year: number;
+  posterUrl: string | null;
+  backdropUrl: string | null;
+  genres: string[];
+  synopsis: string;
+  runtime: number | null;
+  imdbRating: string | null;
+  rtCriticScore: string | null;
+  streamingServices: string[];
+  cachedAt?: string;
 }
 
 export interface Session {
