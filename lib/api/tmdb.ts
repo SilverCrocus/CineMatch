@@ -59,6 +59,7 @@ const GENRE_MAP: Record<number, string> = {
 
 async function tmdbFetch<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
+  url.searchParams.append("api_key", process.env.TMDB_API_KEY || "");
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       url.searchParams.append(key, value);
@@ -67,7 +68,6 @@ async function tmdbFetch<T>(endpoint: string, params?: Record<string, string>): 
 
   const response = await fetch(url.toString(), {
     headers: {
-      Authorization: `Bearer ${process.env.TMDB_API_KEY}`,
       "Content-Type": "application/json",
     },
     next: { revalidate: 3600 }, // Cache for 1 hour
