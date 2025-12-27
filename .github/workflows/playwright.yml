@@ -13,6 +13,7 @@ jobs:
       gemini_flash_key: ${{ secrets.GEMINI_FLASH_KEY }}
       NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NEXTAUTH_URL: http://localhost:3000
+      TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
