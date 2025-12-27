@@ -124,8 +124,13 @@ export default function SessionPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="text-5xl animate-bounce">🎬</div>
+          <p className="text-lg text-muted-foreground animate-pulse">
+            Loading your session...
+          </p>
+        </div>
       </div>
     );
   }

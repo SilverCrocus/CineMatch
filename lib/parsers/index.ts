@@ -1,35 +1,12 @@
 import type { ParsedMovieList, MovieListParser } from "./types";
-import { rottenTomatoesParser } from "./rotten-tomatoes";
-import { letterboxdParser } from "./letterboxd";
-import { listChallengesParser } from "./list-challenges";
-import { imdbParser } from "./imdb";
-import { genericParser } from "./generic";
+import { parseWithLLM } from "./llm-parser";
 
-const parsers: MovieListParser[] = [
-  rottenTomatoesParser,
-  letterboxdParser,
-  listChallengesParser,
-  imdbParser,
-  genericParser, // Fallback - must be last
-];
-
+/**
+ * Parse movie titles from any URL using Gemini 3 Flash.
+ * Works on any website containing movie lists.
+ */
 export async function parseMovieListUrl(url: string): Promise<ParsedMovieList> {
-  for (const parser of parsers) {
-    if (parser.canParse(url)) {
-      try {
-        return await parser.parse(url);
-      } catch (error) {
-        console.error(`Parser ${parser.name} failed:`, error);
-        continue;
-      }
-    }
-  }
-
-  return {
-    titles: [],
-    source: "unknown",
-    error: "No parser could handle this URL",
-  };
+  return parseWithLLM(url);
 }
 
 export function parseTextList(text: string): string[] {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Filter, Link, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,25 @@ const GENRES = Object.entries(GENRE_MAP).map(([id, name]) => ({
   name,
 }));
 
+// Fun loading messages for URL parsing
+const LOADING_MESSAGES = [
+  "🎬 Scanning the movie list...",
+  "🍿 Popping some popcorn while we work...",
+  "🎥 Rolling the film reel...",
+  "🌟 Gathering the stars...",
+  "📽️ Rewinding to find the classics...",
+  "🎞️ Processing frames of greatness...",
+  "🎭 Assembling the cast...",
+  "🏆 Picking the award winners...",
+  "🎪 Setting up the cinema...",
+  "🎯 Curating your selection...",
+];
+
 export default function CreateSessionPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("filters");
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
 
   // Filters state
   const [selectedGenres, setSelectedGenres] = useState<number[]>([]);
@@ -32,6 +47,19 @@ export default function CreateSessionPage() {
   // Text state
   const [textList, setTextList] = useState("");
 
+  // Cycle through loading messages
+  useEffect(() => {
+    if (!loading) return;
+    const interval = setInterval(() => {
+      setLoadingMessage((prev) => {
+        const currentIndex = LOADING_MESSAGES.indexOf(prev);
+        const nextIndex = (currentIndex + 1) % LOADING_MESSAGES.length;
+        return LOADING_MESSAGES[nextIndex];
+      });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [loading]);
+
   const toggleGenre = (id: number) => {
     setSelectedGenres((prev) =>
       prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
@@ -40,6 +68,7 @@ export default function CreateSessionPage() {
 
   const handleCreate = async () => {
     setLoading(true);
+    setLoadingMessage(LOADING_MESSAGES[Math.floor(Math.random() * LOADING_MESSAGES.length)]);
 
     try {
       let source: any = { type: activeTab };
@@ -165,10 +194,10 @@ export default function CreateSessionPage() {
           {activeTab === "url" && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Paste a URL from Rotten Tomatoes, Letterboxd, ListChallenges, or IMDb
+                Paste any URL with a movie list — our AI will extract the titles
               </p>
               <Input
-                placeholder="https://letterboxd.com/..."
+                placeholder="https://rottentomatoes.com/... or any movie list URL"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
               />
@@ -195,6 +224,26 @@ export default function CreateSessionPage() {
       <Button className="w-full" size="lg" onClick={handleCreate} disabled={loading}>
         {loading ? "Creating..." : "Create Session"}
       </Button>
+
+      {/* Full-screen loading overlay for URL parsing */}
+      {loading && activeTab === "url" && (
+        <div className="fixed inset-0 bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+          <div className="text-center space-y-6">
+            <div className="text-6xl animate-bounce">🎬</div>
+            <div className="space-y-2">
+              <p className="text-xl font-medium">{loadingMessage}</p>
+              <p className="text-sm text-muted-foreground">
+                Our AI is extracting movies from the page
+              </p>
+            </div>
+            <div className="flex justify-center gap-1">
+              <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+              <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+              <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
