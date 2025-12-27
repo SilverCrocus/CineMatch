@@ -46,16 +46,11 @@ export async function POST(request: Request) {
       secret: process.env.NEXTAUTH_SECRET!,
     });
 
-    // Set the session cookie
+    // Set the session cookie (non-production since we returned early for production)
     const cookieStore = await cookies();
-    const cookieName =
-      process.env.NODE_ENV === "production"
-        ? "__Secure-next-auth.session-token"
-        : "next-auth.session-token";
-
-    cookieStore.set(cookieName, token, {
+    cookieStore.set("next-auth.session-token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24, // 24 hours
