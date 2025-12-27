@@ -11,21 +11,28 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         className={cn(
-          "inline-flex items-center justify-center whitespace-nowrap rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+          // Base styles
+          "inline-flex items-center justify-center whitespace-nowrap font-[family-name:var(--font-syne)] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]",
+          // Variants
           {
-            "bg-primary text-primary-foreground hover:bg-primary/90":
+            // Primary - silver accent
+            "bg-primary text-primary-foreground rounded-xl shadow-[0_4px_16px_rgba(196,206,228,0.25)] hover:brightness-110 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(196,206,228,0.35)]":
               variant === "default",
-            "bg-secondary text-secondary-foreground hover:bg-secondary/80":
+            // Secondary - elevated surface
+            "bg-elevated text-foreground rounded-xl hover:bg-card-hover":
               variant === "secondary",
-            "border border-border bg-transparent hover:bg-secondary":
+            // Outline
+            "border border-border-medium bg-transparent rounded-xl hover:bg-secondary":
               variant === "outline",
-            "hover:bg-secondary": variant === "ghost",
+            // Ghost
+            "hover:bg-secondary rounded-lg": variant === "ghost",
           },
+          // Sizes
           {
-            "h-10 px-4 py-2": size === "default",
-            "h-9 px-3 text-sm": size === "sm",
-            "h-12 px-8 text-lg": size === "lg",
-            "h-10 w-10": size === "icon",
+            "h-12 px-6 text-base": size === "default",
+            "h-10 px-4 text-sm": size === "sm",
+            "h-14 px-8 text-lg": size === "lg",
+            "h-10 w-10 rounded-lg": size === "icon",
           },
           className
         )}
