@@ -82,6 +82,15 @@ CREATE TABLE watched_movies (
   watched_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Solo mode watchlist
+CREATE TABLE solo_watchlist (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  movie_id INTEGER NOT NULL,
+  added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, movie_id)
+);
+
 -- Indexes for performance
 CREATE INDEX idx_friendships_user_id ON friendships(user_id);
 CREATE INDEX idx_friendships_friend_id ON friendships(friend_id);
@@ -93,3 +102,5 @@ CREATE INDEX idx_swipes_session_id ON swipes(session_id);
 CREATE INDEX idx_swipes_user_id ON swipes(user_id);
 CREATE INDEX idx_cached_movies_tmdb_id ON cached_movies(tmdb_id);
 CREATE INDEX idx_watched_movies_watched_by ON watched_movies USING GIN(watched_by);
+CREATE INDEX idx_solo_watchlist_user_id ON solo_watchlist(user_id);
+CREATE INDEX idx_solo_watchlist_movie_id ON solo_watchlist(movie_id);
