@@ -293,7 +293,7 @@ test.describe("URL Parser", () => {
 
       // Enter a movie list URL (using a reliable test URL)
       const testUrl = "https://editorial.rottentomatoes.com/guide/best-sports-movie-of-all-time/";
-      await page.locator('input[placeholder*="letterboxd" i]').fill(testUrl);
+      await page.locator('input[placeholder*="rottentomatoes" i]').fill(testUrl);
 
       // Create the session
       await page.getByRole("button", { name: "Create Session" }).click();
