@@ -17,7 +17,7 @@ export function Logo({ size = "default", className, showGlow = false }: LogoProp
   const { width, height } = sizes[size];
 
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative flex items-center justify-center", className)}>
       {showGlow && (
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-[200%] bg-[radial-gradient(ellipse,rgba(196,206,228,0.15)_0%,transparent_70%)] blur-xl pointer-events-none"
@@ -29,7 +29,7 @@ export function Logo({ size = "default", className, showGlow = false }: LogoProp
         alt="Cinematch"
         width={width}
         height={height}
-        className="relative z-10"
+        className="relative z-10 object-contain"
         priority
       />
     </div>
