@@ -15,7 +15,7 @@ interface SwipeCardProps {
 
 export function SwipeCard({ movie, onSwipe, isTop }: SwipeCardProps) {
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 200], [-15, 15]);
+  const rotate = useTransform(x, [-200, 200], [-12, 12]);
   const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
 
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
@@ -39,7 +39,7 @@ export function SwipeCard({ movie, onSwipe, isTop }: SwipeCardProps) {
       onDragEnd={handleDragEnd}
       whileTap={{ cursor: "grabbing" }}
     >
-      <div className="relative w-full h-full rounded-2xl overflow-hidden bg-card shadow-2xl">
+      <div className="relative w-full h-full rounded-3xl overflow-hidden bg-card shadow-[0_24px_48px_rgba(0,0,0,0.5)]">
         {/* Movie Poster */}
         {movie.posterUrl ? (
           <Image
@@ -50,52 +50,49 @@ export function SwipeCard({ movie, onSwipe, isTop }: SwipeCardProps) {
             priority
           />
         ) : (
-          <div className="w-full h-full bg-secondary flex items-center justify-center">
-            <span className="text-muted-foreground">No poster</span>
+          <div className="w-full h-full bg-gradient-to-b from-[#1e3a5f] to-[#0d1f33] flex items-center justify-center">
+            <span className="text-6xl opacity-30">🎬</span>
           </div>
         )}
 
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-
         {/* Like/Nope Indicators */}
         <motion.div
-          className="absolute top-8 right-8 px-4 py-2 border-4 border-green-500 rounded-lg rotate-12"
+          className="absolute top-8 right-8 px-5 py-2 border-4 border-[#5de890] rounded-xl rotate-12 bg-black/20"
           style={{ opacity: likeOpacity }}
         >
-          <span className="text-2xl font-bold text-green-500">LIKE</span>
+          <span className="text-2xl font-[family-name:var(--font-syne)] font-bold text-[#5de890]">LIKE</span>
         </motion.div>
         <motion.div
-          className="absolute top-8 left-8 px-4 py-2 border-4 border-red-500 rounded-lg -rotate-12"
+          className="absolute top-8 left-8 px-5 py-2 border-4 border-[#e85d75] rounded-xl -rotate-12 bg-black/20"
           style={{ opacity: nopeOpacity }}
         >
-          <span className="text-2xl font-bold text-red-500">NOPE</span>
+          <span className="text-2xl font-[family-name:var(--font-syne)] font-bold text-[#e85d75]">NOPE</span>
         </motion.div>
 
-        {/* Movie Info */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 space-y-3">
+        {/* Glass Overlay Panel */}
+        <div className="absolute bottom-0 left-0 right-0 p-6 glass">
           {/* Title & Year */}
-          <div>
-            <h2 className="text-2xl font-bold text-white">{movie.title}</h2>
-            <p className="text-white/70">{movie.year}</p>
+          <div className="mb-3">
+            <h2 className="text-2xl font-[family-name:var(--font-syne)] font-bold text-white">{movie.title}</h2>
+            <p className="text-white/60">{movie.year}</p>
           </div>
 
-          {/* Ratings */}
-          <div className="flex items-center gap-4">
+          {/* Ratings & Runtime */}
+          <div className="flex items-center gap-5 mb-3">
             {movie.imdbRating && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                <span className="text-white text-sm">{movie.imdbRating}</span>
+                <span className="text-white text-sm font-medium">{movie.imdbRating}</span>
               </div>
             )}
             {movie.rtCriticScore && (
-              <div className="flex items-center gap-1">
-                <span className="text-red-500 text-xs font-bold">RT</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-red-500 text-xs font-bold">🍅</span>
                 <span className="text-white text-sm">{movie.rtCriticScore}</span>
               </div>
             )}
             {movie.runtime && (
-              <div className="flex items-center gap-1 text-white/70">
+              <div className="flex items-center gap-1.5 text-white/60">
                 <Clock className="h-4 w-4" />
                 <span className="text-sm">{formatRuntime(movie.runtime)}</span>
               </div>
@@ -103,22 +100,28 @@ export function SwipeCard({ movie, onSwipe, isTop }: SwipeCardProps) {
           </div>
 
           {/* Genres */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 mb-3">
             {movie.genres.slice(0, 3).map((genre) => (
-              <Badge key={genre} variant="secondary" className="bg-white/20 text-white">
+              <Badge
+                key={genre}
+                variant="secondary"
+                className="bg-white/10 text-white/80 border-0"
+              >
                 {genre}
               </Badge>
             ))}
           </div>
 
           {/* Synopsis */}
-          <p className="text-white/80 text-sm line-clamp-3">{movie.synopsis}</p>
+          <p className="text-white/70 text-sm line-clamp-2 leading-relaxed">
+            {movie.synopsis}
+          </p>
 
-          {/* Streaming */}
+          {/* Streaming Services */}
           {movie.streamingServices.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-white/50 text-xs">Available on:</span>
-              <span className="text-white text-xs">
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/10">
+              <span className="text-white/40 text-xs">Available on:</span>
+              <span className="text-white/70 text-xs">
                 {movie.streamingServices.slice(0, 3).join(", ")}
               </span>
             </div>

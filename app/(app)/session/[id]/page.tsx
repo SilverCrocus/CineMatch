@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { Copy, Check, Play, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { SwipeDeck } from "@/components/swipe/swipe-deck";
 import type { Movie } from "@/types";
@@ -146,42 +146,43 @@ export default function SessionPage() {
   // LOBBY VIEW
   if (session.status === "lobby") {
     return (
-      <main className="min-h-screen p-4 max-w-lg mx-auto">
-        <div className="text-center py-8">
-          <h1 className="text-2xl font-bold mb-2">Session Lobby</h1>
-          <p className="text-muted-foreground mb-6">
+      <main className="min-h-screen p-5 max-w-lg mx-auto">
+        <div className="text-center pt-8">
+          <h1 className="text-2xl font-[family-name:var(--font-syne)] font-bold mb-2">Session Lobby</h1>
+          <p className="text-text-secondary mb-8">
             Share the code with friends to join
           </p>
 
-          {/* Room Code */}
-          <Card className="mb-8">
-            <CardContent className="py-8">
-              <div className="text-4xl font-mono font-bold tracking-widest mb-4">
-                {session.code}
-              </div>
-              <Button variant="secondary" onClick={copyCode}>
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4 mr-2" /> Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 mr-2" /> Copy Code
-                  </>
-                )}
-              </Button>
-            </CardContent>
+          {/* Room Code Card */}
+          <Card className="mb-8 p-8">
+            <div className="text-4xl font-mono font-bold tracking-[0.2em] mb-5 bg-gradient-to-r from-foreground to-accent bg-clip-text text-transparent">
+              {session.code}
+            </div>
+            <Button variant="secondary" onClick={copyCode} className="gap-2">
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" /> Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" /> Copy Code
+                </>
+              )}
+            </Button>
           </Card>
 
           {/* Participants */}
           <div className="mb-8">
-            <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="flex items-center justify-center gap-2 mb-4 text-text-secondary">
               <Users className="h-5 w-5" />
               <span>{session.participants.length} joined</span>
             </div>
             <div className="flex justify-center gap-2 flex-wrap">
               {session.participants.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 bg-secondary rounded-full px-3 py-1">
+                <div
+                  key={p.id}
+                  className="flex items-center gap-2 bg-card rounded-full pl-1 pr-4 py-1 shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
+                >
                   <Avatar
                     src={p.user?.image}
                     alt={p.nickname}
@@ -195,14 +196,12 @@ export default function SessionPage() {
           </div>
 
           {/* Start Button (Host Only) */}
-          {session.isHost && (
-            <Button size="lg" onClick={startSession} className="w-full">
-              <Play className="h-5 w-5 mr-2" />
+          {session.isHost ? (
+            <Button size="lg" onClick={startSession} className="w-full gap-2">
+              <Play className="h-5 w-5" />
               Start Swiping ({session.movies.length} movies)
             </Button>
-          )}
-
-          {!session.isHost && (
+          ) : (
             <p className="text-muted-foreground">
               Waiting for host to start...
             </p>
@@ -257,17 +256,21 @@ export default function SessionPage() {
 
   // REVEALED VIEW
   return (
-    <main className="min-h-screen p-4 max-w-lg mx-auto">
-      <div className="text-center py-8">
+    <main className="min-h-screen p-5 max-w-lg mx-auto">
+      <div className="text-center pt-8">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", duration: 0.6 }}
           className="mb-8"
         >
-          <h1 className="text-3xl font-bold mb-2">
+          <div className="text-5xl mb-4">
+            {matches.length > 0 ? "🎉" : "😢"}
+          </div>
+          <h1 className="text-3xl font-[family-name:var(--font-syne)] font-bold mb-2 bg-gradient-to-r from-foreground to-accent bg-clip-text text-transparent">
             {matches.length > 0 ? "You matched!" : "No matches"}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-text-secondary">
             {matches.length > 0
               ? `${matches.length} movie${matches.length > 1 ? "s" : ""} everyone liked`
               : "Try again with different filters"}
@@ -275,44 +278,45 @@ export default function SessionPage() {
         </motion.div>
 
         {matches.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-3 mb-8">
             <AnimatePresence>
               {matches.map((movie, i) => (
                 <motion.div
                   key={movie.tmdbId}
-                  initial={{ y: 50, opacity: 0 }}
+                  initial={{ y: 30, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: i * 0.1 }}
+                  transition={{ delay: i * 0.1, type: "spring" }}
                 >
                   <Card
-                    className={`cursor-pointer transition-all ${
+                    variant="interactive"
+                    className={`flex items-center gap-4 p-4 ${
                       selectedMovie === movie.tmdbId
-                        ? "ring-2 ring-primary"
-                        : "hover:bg-secondary/50"
+                        ? "ring-2 ring-primary shadow-[0_0_20px_rgba(196,206,228,0.2)]"
+                        : ""
                     }`}
                     onClick={() => selectMovie(movie.tmdbId)}
                   >
-                    <CardContent className="flex items-center gap-4 py-4">
-                      {movie.posterUrl && (
-                        <img
-                          src={movie.posterUrl}
-                          alt={movie.title}
-                          className="h-24 w-16 object-cover rounded"
-                        />
+                    {movie.posterUrl && (
+                      <img
+                        src={movie.posterUrl}
+                        alt={movie.title}
+                        className="h-20 w-14 object-cover rounded-lg flex-shrink-0"
+                      />
+                    )}
+                    <div className="text-left flex-1 min-w-0">
+                      <h3 className="font-[family-name:var(--font-syne)] font-semibold truncate">{movie.title}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {movie.year} • {movie.genres.slice(0, 2).join(", ")}
+                      </p>
+                      {movie.imdbRating && (
+                        <p className="text-sm text-text-secondary mt-1">⭐ {movie.imdbRating}</p>
                       )}
-                      <div className="text-left flex-1">
-                        <h3 className="font-semibold">{movie.title}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {movie.year} • {movie.genres.slice(0, 2).join(", ")}
-                        </p>
-                        {movie.imdbRating && (
-                          <p className="text-sm">⭐ {movie.imdbRating}</p>
-                        )}
+                    </div>
+                    {selectedMovie === movie.tmdbId && (
+                      <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                        <Check className="h-4 w-4 text-primary-foreground" />
                       </div>
-                      {selectedMovie === movie.tmdbId && (
-                        <Check className="h-6 w-6 text-primary" />
-                      )}
-                    </CardContent>
+                    )}
                   </Card>
                 </motion.div>
               ))}
@@ -322,7 +326,7 @@ export default function SessionPage() {
 
         <Button
           variant="secondary"
-          className="mt-8"
+          className="w-full"
           onClick={() => router.push("/dashboard")}
         >
           Back to Dashboard

@@ -1,25 +1,29 @@
-import { HTMLAttributes } from "react";
+import { HTMLAttributes, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-export interface BadgeProps extends HTMLAttributes<HTMLDivElement> {
+export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: "default" | "secondary" | "outline";
 }
 
-function Badge({ className, variant = "default", ...props }: BadgeProps) {
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors",
-        {
-          "bg-primary text-primary-foreground": variant === "default",
-          "bg-secondary text-secondary-foreground": variant === "secondary",
-          "border border-border text-foreground": variant === "outline",
-        },
-        className
-      )}
-      {...props}
-    />
-  );
-}
+const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
+  ({ className, variant = "default", ...props }, ref) => {
+    return (
+      <span
+        ref={ref}
+        className={cn(
+          "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-colors",
+          {
+            "bg-primary text-primary-foreground": variant === "default",
+            "bg-secondary text-secondary-foreground": variant === "secondary",
+            "border border-border bg-transparent": variant === "outline",
+          },
+          className
+        )}
+        {...props}
+      />
+    );
+  }
+);
+Badge.displayName = "Badge";
 
 export { Badge };

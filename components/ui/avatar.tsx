@@ -15,35 +15,34 @@ interface AvatarProps {
 export function Avatar({ src, alt, fallback, size = "md", className }: AvatarProps) {
   const [error, setError] = useState(false);
 
-  const sizeClasses = {
-    sm: "h-8 w-8 text-xs",
-    md: "h-10 w-10 text-sm",
-    lg: "h-12 w-12 text-base",
+  const sizes = {
+    sm: "w-7 h-7 text-xs",
+    md: "w-10 h-10 text-sm",
+    lg: "w-12 h-12 text-base",
   };
 
-  if (!src || error) {
-    return (
-      <div
-        className={cn(
-          "flex items-center justify-center rounded-full bg-primary text-primary-foreground font-medium",
-          sizeClasses[size],
-          className
-        )}
-      >
-        {fallback.slice(0, 2).toUpperCase()}
-      </div>
-    );
-  }
-
   return (
-    <div className={cn("relative rounded-full overflow-hidden", sizeClasses[size], className)}>
-      <Image
-        src={src}
-        alt={alt}
-        fill
-        className="object-cover"
-        onError={() => setError(true)}
-      />
+    <div
+      className={cn(
+        "rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center overflow-hidden flex-shrink-0",
+        sizes[size],
+        className
+      )}
+    >
+      {src && !error ? (
+        <Image
+          src={src}
+          alt={alt}
+          width={48}
+          height={48}
+          className="w-full h-full object-cover"
+          onError={() => setError(true)}
+        />
+      ) : (
+        <span className="font-[family-name:var(--font-syne)] font-bold text-primary-foreground">
+          {fallback}
+        </span>
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Plus, Users, History, LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 
@@ -41,7 +41,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <main className="min-h-screen p-4 max-w-lg mx-auto">
+    <main className="min-h-screen p-5 max-w-lg mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
@@ -52,7 +52,7 @@ export default function DashboardPage() {
             size="lg"
           />
           <div>
-            <p className="font-medium">{session?.user?.name}</p>
+            <p className="font-[family-name:var(--font-syne)] font-semibold text-lg">{session?.user?.name}</p>
             <p className="text-sm text-muted-foreground">Welcome back!</p>
           </div>
         </div>
@@ -61,75 +61,80 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* Quick Actions */}
-      <div className="space-y-4">
-        {/* Create Session */}
-        <Card className="border-primary/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5 text-primary" />
-              New Session
-            </CardTitle>
-            <CardDescription>
-              Create a movie night session and invite friends
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      {/* Bento Grid */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Hero Card - Create Session */}
+        <Card variant="hero" className="col-span-2 p-7">
+          {/* Glow effect */}
+          <div
+            className="absolute -top-1/2 -right-1/4 w-[250px] h-[250px] bg-[radial-gradient(circle,rgba(196,206,228,0.1)_0%,transparent_70%)] pointer-events-none"
+            aria-hidden="true"
+          />
+          <div className="relative z-10">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-4 shadow-[0_4px_16px_rgba(196,206,228,0.2)]">
+              <Plus className="h-7 w-7 text-primary-foreground" />
+            </div>
+            <h2 className="font-[family-name:var(--font-syne)] font-bold text-xl mb-2">New Session</h2>
+            <p className="text-text-secondary mb-5">
+              Create a movie night and invite friends
+            </p>
             <Button
               className="w-full"
               onClick={() => router.push("/session/create")}
             >
               Create Session
             </Button>
-          </CardContent>
+          </div>
         </Card>
 
-        {/* Join Session */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Join Session</CardTitle>
-            <CardDescription>Enter a room code to join</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        {/* Join Session Card */}
+        <Card className="col-span-2 p-5">
+          <h3 className="font-[family-name:var(--font-syne)] font-semibold mb-1">Join Session</h3>
+          <p className="text-sm text-text-secondary mb-4">Enter a room code to join</p>
+          <div className="flex gap-3">
             <Input
-              placeholder="Enter code (e.g., X7K2)"
+              placeholder="Code"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               maxLength={6}
+              className="font-mono tracking-widest uppercase"
             />
             <Button
               variant="secondary"
-              className="w-full"
               onClick={handleJoinSession}
               disabled={joining || !joinCode.trim()}
+              className="px-6"
             >
-              {joining ? "Joining..." : "Join"}
+              {joining ? "..." : "Join"}
             </Button>
-          </CardContent>
+          </div>
         </Card>
 
-        {/* Navigation Cards */}
-        <div className="grid grid-cols-2 gap-4">
-          <Card
-            className="cursor-pointer hover:bg-secondary/50 transition-colors"
-            onClick={() => router.push("/friends")}
-          >
-            <CardContent className="flex flex-col items-center justify-center py-6">
-              <Users className="h-8 w-8 text-primary mb-2" />
-              <span className="font-medium">Friends</span>
-            </CardContent>
-          </Card>
+        {/* Friends Card */}
+        <Card
+          variant="interactive"
+          className="p-6 flex flex-col items-center text-center"
+          onClick={() => router.push("/friends")}
+        >
+          <div className="w-12 h-12 rounded-xl bg-glow flex items-center justify-center mb-3">
+            <Users className="h-6 w-6 text-accent" />
+          </div>
+          <span className="font-[family-name:var(--font-syne)] font-semibold">Friends</span>
+          <span className="text-sm text-muted-foreground">View all</span>
+        </Card>
 
-          <Card
-            className="cursor-pointer hover:bg-secondary/50 transition-colors"
-            onClick={() => router.push("/history")}
-          >
-            <CardContent className="flex flex-col items-center justify-center py-6">
-              <History className="h-8 w-8 text-primary mb-2" />
-              <span className="font-medium">History</span>
-            </CardContent>
-          </Card>
-        </div>
+        {/* History Card */}
+        <Card
+          variant="interactive"
+          className="p-6 flex flex-col items-center text-center"
+          onClick={() => router.push("/history")}
+        >
+          <div className="w-12 h-12 rounded-xl bg-glow flex items-center justify-center mb-3">
+            <History className="h-6 w-6 text-accent" />
+          </div>
+          <span className="font-[family-name:var(--font-syne)] font-semibold">History</span>
+          <span className="text-sm text-muted-foreground">Past sessions</span>
+        </Card>
       </div>
     </main>
   );
