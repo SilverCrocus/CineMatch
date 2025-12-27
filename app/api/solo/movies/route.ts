@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
               10752: "War",
               37: "Western",
             })
-              .filter(([_, name]) => baseMovie.genres.includes(name))
+              .filter(([, name]) => baseMovie.genres.includes(name))
               .map(([id]) => parseInt(id))
           : [];
 
