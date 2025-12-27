@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Plus, Users, History, LogOut } from "lucide-react";
+import { Plus, Users, Heart, LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -123,17 +123,17 @@ export default function DashboardPage() {
           <span className="text-sm text-muted-foreground">View all</span>
         </Card>
 
-        {/* History Card */}
+        {/* Solo Mode Card */}
         <Card
           variant="interactive"
           className="p-6 flex flex-col items-center text-center"
-          onClick={() => router.push("/history")}
+          onClick={() => router.push("/solo")}
         >
           <div className="w-12 h-12 rounded-xl bg-glow flex items-center justify-center mb-3">
-            <History className="h-6 w-6 text-accent" />
+            <Heart className="h-6 w-6 text-accent" />
           </div>
-          <span className="font-[family-name:var(--font-syne)] font-semibold">History</span>
-          <span className="text-sm text-muted-foreground">Past sessions</span>
+          <span className="font-[family-name:var(--font-syne)] font-semibold">Solo Mode</span>
+          <span className="text-sm text-muted-foreground">Your watchlist</span>
         </Card>
       </div>
     </main>
