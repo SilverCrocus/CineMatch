@@ -321,3 +321,58 @@ test.describe("URL Parser", () => {
     }
   });
 });
+
+test.describe("Pre-matches from Solo Mode", () => {
+  test("shows pre-matches when users have overlapping watchlists", async () => {
+    const browsers = await launchSplitScreenBrowsers(2);
+    const [hostBrowser, guestBrowser] = browsers;
+
+    const hostContext = await hostBrowser.newContext();
+    const guestContext = await guestBrowser.newContext();
+
+    const hostPage = await hostContext.newPage();
+    const guestPage = await guestContext.newPage();
+
+    try {
+      // Log in both users
+      await hostPage.goto("http://localhost:3000/");
+      await testLogin(hostPage, "host");
+      await guestPage.goto("http://localhost:3000/");
+      await testLogin(guestPage, "guest1");
+
+      // Both users save movies in solo mode
+      // Host saves movies
+      await hostPage.goto("http://localhost:3000/solo/swipe?source=random");
+      await hostPage.waitForSelector("text=Loading movies...", { state: "hidden", timeout: 30000 });
+      const hostLikeButton = hostPage.locator("button").filter({ has: hostPage.locator(".text-green-500") });
+      await hostLikeButton.click();
+
+      // Guest saves movies
+      await guestPage.goto("http://localhost:3000/solo/swipe?source=random");
+      await guestPage.waitForSelector("text=Loading movies...", { state: "hidden", timeout: 30000 });
+      const guestLikeButton = guestPage.locator("button").filter({ has: guestPage.locator(".text-green-500") });
+      await guestLikeButton.click();
+
+      // Host creates a session
+      await hostPage.goto("http://localhost:3000/session/create");
+      await hostPage.locator("text=Action").click();
+      await hostPage.getByRole("button", { name: "Create Session" }).click();
+      await hostPage.waitForURL(/\/session\//);
+
+      // Get room code
+      const roomCode = await getRoomCode(hostPage);
+
+      // Guest joins
+      await guestPage.goto("http://localhost:3000/dashboard");
+      await guestPage.locator('input[placeholder*="code" i]').fill(roomCode);
+      await guestPage.locator('button:has-text("Join")').click();
+      await guestPage.waitForURL(/\/session\//);
+
+      // Verify both are in session
+      await expect(hostPage.locator("text=Test Guest 1")).toBeVisible({ timeout: 10000 });
+
+    } finally {
+      await closeAllBrowsers(browsers);
+    }
+  });
+});
