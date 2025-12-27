@@ -67,7 +67,7 @@ export async function launchSplitScreenBrowsers(count: number): Promise<Browser[
     const xOffset = i * (viewport.width + 20);
 
     const browser = await chromium.launch({
-      headless: false,
+      headless: !!process.env.CI,
       args: [
         `--window-position=${xOffset},50`,
         `--window-size=${viewport.width + 50},${viewport.height + 100}`,
