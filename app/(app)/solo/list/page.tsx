@@ -1,0 +1,98 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Trash2, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import type { Movie } from "@/types";
+
+interface WatchlistItem {
+  id: string;
+  movieId: number;
+  addedAt: string;
+  movie?: Movie;
+}
+
+export default function MyListPage() {
+  const router = useRouter();
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/solo/list")
+      .then((res) => res.json())
+      .then((data) => {
+        setWatchlist(data.watchlist || []);
+        setLoading(false);
+      });
+  }, []);
+
+  const handleRemove = async (movieId: number) => {
+    await fetch("/api/solo/list", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ movieId }),
+    });
+    setWatchlist((prev) => prev.filter((item) => item.movieId !== movieId));
+  };
+
+  return (
+    <main className="min-h-screen p-4 max-w-lg mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-xl font-bold font-[family-name:var(--font-syne)]">
+            My List
+          </h1>
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {watchlist.length} movies
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-8 text-muted-foreground">Loading...</div>
+      ) : watchlist.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground mb-4">Your list is empty</p>
+          <Button onClick={() => router.push("/solo")}>
+            <Plus className="h-4 w-4 mr-2" />
+            Start swiping
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4">
+          {watchlist.map((item) => (
+            <Card key={item.id} className="overflow-hidden group relative">
+              {item.movie?.posterUrl && (
+                <img
+                  src={item.movie.posterUrl}
+                  alt={item.movie.title}
+                  className="w-full aspect-[2/3] object-cover"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute bottom-0 left-0 right-0 p-3">
+                  <p className="text-white text-sm font-medium truncate">
+                    {item.movie?.title}
+                  </p>
+                  <button
+                    onClick={() => handleRemove(item.movieId)}
+                    className="mt-2 text-red-400 text-xs flex items-center gap-1 hover:text-red-300"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </main>
+  );
+}
