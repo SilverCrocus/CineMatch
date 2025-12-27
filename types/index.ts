@@ -84,6 +84,14 @@ export interface WatchedMovie {
   movie?: Movie;
 }
 
+export interface SoloWatchlistItem {
+  id: string;
+  userId: string;
+  movieId: number;
+  addedAt: Date;
+  movie?: Movie;
+}
+
 export interface DeckSource {
   type: "filters" | "url" | "text";
   filters?: {
