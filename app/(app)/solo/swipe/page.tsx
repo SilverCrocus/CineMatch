@@ -2,10 +2,28 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, X, Heart } from "lucide-react";
+import { ArrowLeft, X, Heart, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import type { Movie } from "@/types";
+
+// Build best-effort Rotten Tomatoes slug from movie title
+function buildRTSlug(title: string, year?: number): string {
+  let slug = title
+    .toLowerCase()
+    .replace(/['']/g, "")           // Remove apostrophes
+    .replace(/[^a-z0-9\s]/g, "")    // Remove special chars
+    .replace(/\s+/g, "_")           // Spaces to underscores
+    .replace(/_+/g, "_")            // Collapse multiple underscores
+    .replace(/^_|_$/g, "");         // Trim underscores
+
+  // Add year suffix if provided (helps disambiguate remakes)
+  if (year && year >= 2000) {
+    slug = `${slug}_${year}`;
+  }
+
+  return slug;
+}
 
 function SoloSwipeContent() {
   const router = useRouter();
@@ -18,6 +36,7 @@ function SoloSwipeContent() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [savedCount, setSavedCount] = useState(0);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams({ source });
@@ -33,6 +52,11 @@ function SoloSwipeContent() {
   }, [source, genre, movie]);
 
   const currentMovie = movies[currentIndex];
+
+  // Reset expanded state when movie changes
+  useEffect(() => {
+    setExpanded(false);
+  }, [currentIndex]);
 
   const handleSwipe = useCallback(
     async (liked: boolean) => {
@@ -56,6 +80,7 @@ function SoloSwipeContent() {
     (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") handleSwipe(false);
       if (e.key === "ArrowRight") handleSwipe(true);
+      if (e.key === " " || e.key === "Enter") setExpanded((prev) => !prev);
     },
     [handleSwipe]
   );
@@ -66,6 +91,14 @@ function SoloSwipeContent() {
   }, [handleKeyDown]);
 
   const isDone = currentIndex >= movies.length;
+
+  const handleCardClick = () => {
+    setExpanded((prev) => !prev);
+  };
+
+  const handleLinkClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Don't toggle expanded when clicking links
+  };
 
   return (
     <main className="min-h-screen p-4 max-w-lg mx-auto flex flex-col">
@@ -108,7 +141,8 @@ function SoloSwipeContent() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="absolute inset-0"
+                className="absolute inset-0 cursor-pointer"
+                onClick={handleCardClick}
               >
                 <div className="h-full rounded-2xl overflow-hidden relative">
                   {currentMovie.posterUrl && (
@@ -118,19 +152,93 @@ function SoloSwipeContent() {
                       className="w-full h-full object-cover"
                     />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-6">
+
+                  {/* Gradient Overlay - darker when expanded */}
+                  <motion.div
+                    className="absolute inset-0"
+                    animate={{
+                      background: expanded
+                        ? "linear-gradient(to top, rgba(0,0,0,0.95) 60%, rgba(0,0,0,0.7) 100%)"
+                        : "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 50%, transparent 100%)"
+                    }}
+                    transition={{ duration: 0.3 }}
+                  />
+
+                  {/* Tap for synopsis hint */}
+                  <motion.div
+                    className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-white/10 backdrop-blur-sm rounded-full"
+                    animate={{ opacity: expanded ? 0 : 1 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <span className="text-white/60 text-xs">Tap for synopsis</span>
+                  </motion.div>
+
+                  {/* Content */}
+                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                    {/* Synopsis - shown when expanded */}
+                    <motion.div
+                      className="mb-4 max-h-48 overflow-y-auto"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{
+                        opacity: expanded ? 1 : 0,
+                        y: expanded ? 0 : 20
+                      }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <p className="text-white/90 text-sm leading-relaxed">
+                        {currentMovie.synopsis || "No synopsis available."}
+                      </p>
+                    </motion.div>
+
+                    {/* Title & Meta */}
                     <h2 className="text-2xl font-bold text-white mb-1">
                       {currentMovie.title}
                     </h2>
-                    <p className="text-white/70 text-sm mb-2">
-                      {currentMovie.year} • {currentMovie.genres?.slice(0, 2).join(", ")}
+                    <p className="text-white/70 text-sm mb-3">
+                      {currentMovie.year} {currentMovie.runtime && `• ${currentMovie.runtime} min`} • {currentMovie.genres?.slice(0, 2).join(", ")}
                     </p>
-                    {currentMovie.imdbRating && (
-                      <p className="text-yellow-400 text-sm">
-                        {currentMovie.imdbRating}
-                      </p>
-                    )}
+
+                    {/* Links Row */}
+                    <div className="flex items-center gap-3">
+                      {/* IMDB Link */}
+                      {currentMovie.imdbId && (
+                        <a
+                          href={`https://www.imdb.com/title/${currentMovie.imdbId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={handleLinkClick}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 rounded-full transition-colors"
+                        >
+                          <ExternalLink className="w-3 h-3 text-yellow-400" />
+                          <span className="text-yellow-400 text-xs font-medium">
+                            IMDB {currentMovie.imdbRating || ""}
+                          </span>
+                        </a>
+                      )}
+
+                      {/* RT Score/Link */}
+                      {currentMovie.rtCriticScore && (
+                        <a
+                          href={`https://www.rottentomatoes.com/m/${buildRTSlug(currentMovie.title, currentMovie.year)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={handleLinkClick}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 rounded-full transition-colors"
+                        >
+                          <span className="text-sm">🍅</span>
+                          <span className="text-red-400 text-xs font-medium">
+                            {currentMovie.rtCriticScore}
+                          </span>
+                        </a>
+                      )}
+
+                      {/* Fallback if no RT score but we want to show something */}
+                      {!currentMovie.rtCriticScore && !currentMovie.imdbId && currentMovie.imdbRating && (
+                        <span className="text-yellow-400 text-sm font-medium">
+                          ⭐ {currentMovie.imdbRating}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </motion.div>
