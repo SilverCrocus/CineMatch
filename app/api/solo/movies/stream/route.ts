@@ -17,6 +17,21 @@ import type { Movie } from "@/types";
 
 export const dynamic = "force-dynamic";
 
+// RT audience score filter threshold
+const MIN_RT_AUDIENCE_SCORE = 65;
+
+function parseRTScore(score: string | null): number | null {
+  if (!score) return null;
+  const numeric = parseInt(score.replace('%', ''));
+  return isNaN(numeric) ? null : numeric;
+}
+
+function passesRTFilter(movie: Movie): boolean {
+  const score = parseRTScore(movie.rtAudienceScore);
+  // Include if no score (don't penalize missing data) or score >= threshold
+  return score === null || score >= MIN_RT_AUDIENCE_SCORE;
+}
+
 // Fetch movie without RT data (fast path)
 async function fetchMovieFast(tmdbId: number): Promise<Movie | null> {
   try {
@@ -143,7 +158,7 @@ export async function GET(request: NextRequest) {
           const results = await Promise.all(batch.map(fetchMovieFast));
 
           for (const movie of results) {
-            if (movie) {
+            if (movie && passesRTFilter(movie)) {
               movies.push(movie);
               if (movie.imdbId) {
                 imdbIds.push(movie.imdbId);
