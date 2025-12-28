@@ -1,14 +1,36 @@
-import { StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useAuthContext } from '../../contexts/AuthContext';
 
-import EditScreenInfo from '@/components/EditScreenInfo';
-import { Text, View } from '@/components/Themed';
+export default function HomeScreen() {
+  const { user, signOut } = useAuthContext();
+  const router = useRouter();
 
-export default function TabOneScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Tab One</Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <EditScreenInfo path="app/(tabs)/index.tsx" />
+      <Text style={styles.greeting}>
+        Welcome{user?.name ? `, ${user.name}` : ''}!
+      </Text>
+
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => router.push('/(tabs)/solo')}
+        >
+          <Text style={styles.primaryButtonText}>Start Swiping</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => router.push('/solo/list')}
+        >
+          <Text style={styles.secondaryButtonText}>My List</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -16,16 +38,48 @@ export default function TabOneScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
+    backgroundColor: '#0f0f0f',
+    padding: 24,
     justifyContent: 'center',
   },
-  title: {
-    fontSize: 20,
+  greeting: {
+    fontSize: 28,
     fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 32,
+    textAlign: 'center',
   },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
+  actions: {
+    gap: 16,
+  },
+  primaryButton: {
+    backgroundColor: '#e50914',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    backgroundColor: '#222',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  signOutButton: {
+    marginTop: 48,
+    alignItems: 'center',
+  },
+  signOutText: {
+    color: '#888',
+    fontSize: 14,
   },
 });
