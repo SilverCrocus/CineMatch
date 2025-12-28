@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, Trash2, Plus, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { Movie } from "@/types";
+
+function getIMDbUrl(imdbId: string): string {
+  return `https://www.imdb.com/title/${imdbId}`;
+}
 
 interface WatchlistItem {
   id: string;
@@ -65,51 +69,79 @@ export default function MyListPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           {watchlist.map((item) => (
-            <Card key={item.id} className="overflow-hidden group relative">
-              {item.movie?.posterUrl && (
-                <img
-                  src={item.movie.posterUrl}
-                  alt={item.movie.title}
-                  className="w-full aspect-[2/3] object-cover"
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="absolute bottom-0 left-0 right-0 p-3">
-                  <p className="text-white text-sm font-medium truncate">
-                    {item.movie?.title}
-                  </p>
-                  <p className="text-white/60 text-xs mb-1">
-                    {item.movie?.year}
-                  </p>
-                  {/* Scores */}
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    {item.movie?.imdbRating && (
-                      <span className="text-yellow-400 text-xs">
-                        ⭐ {item.movie.imdbRating}
-                      </span>
-                    )}
-                    {item.movie?.rtCriticScore && (
-                      <span className="text-red-400 text-xs">
-                        🍅 {item.movie.rtCriticScore}
-                      </span>
-                    )}
-                    {item.movie?.rtAudienceScore && (
-                      <span className="text-orange-400 text-xs">
-                        🍿 {item.movie.rtAudienceScore}
-                      </span>
-                    )}
+            <Card key={item.id} className="overflow-hidden relative">
+              {/* Clickable poster area */}
+              <a
+                href={item.movie?.imdbId ? getIMDbUrl(item.movie.imdbId) : "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block"
+              >
+                {item.movie?.posterUrl ? (
+                  <img
+                    src={item.movie.posterUrl}
+                    alt={item.movie.title}
+                    className="w-full aspect-[2/3] object-cover"
+                  />
+                ) : (
+                  <div className="w-full aspect-[2/3] bg-muted flex items-center justify-center">
+                    <span className="text-muted-foreground text-xs">No poster</span>
                   </div>
-                  <button
-                    onClick={() => handleRemove(item.movieId)}
-                    className="text-red-400 text-xs flex items-center gap-1 hover:text-red-300"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    Remove
-                  </button>
+                )}
+                {/* Always visible gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />
+              </a>
+
+              {/* Always visible info */}
+              <div className="absolute bottom-0 left-0 right-0 p-2.5">
+                <p className="text-white text-sm font-medium truncate">
+                  {item.movie?.title}
+                </p>
+                <p className="text-white/60 text-xs mb-1.5">
+                  {item.movie?.year}
+                </p>
+
+                {/* Scores - always visible */}
+                <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                  {item.movie?.imdbRating && (
+                    <span className="text-yellow-400 text-xs bg-black/40 px-1.5 py-0.5 rounded">
+                      ⭐ {item.movie.imdbRating}
+                    </span>
+                  )}
+                  {item.movie?.rtCriticScore && (
+                    <span className="text-red-400 text-xs bg-black/40 px-1.5 py-0.5 rounded">
+                      🍅 {item.movie.rtCriticScore}
+                    </span>
+                  )}
+                  {item.movie?.rtAudienceScore && (
+                    <span className="text-orange-400 text-xs bg-black/40 px-1.5 py-0.5 rounded">
+                      🍿 {item.movie.rtAudienceScore}
+                    </span>
+                  )}
                 </div>
+
+                {/* Remove button */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleRemove(item.movieId);
+                  }}
+                  className="text-red-400 text-xs flex items-center gap-1 hover:text-red-300 bg-black/40 px-2 py-1 rounded"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Remove
+                </button>
               </div>
+
+              {/* External link indicator */}
+              {item.movie?.imdbId && (
+                <div className="absolute top-2 right-2 bg-black/50 p-1 rounded">
+                  <ExternalLink className="h-3 w-3 text-white/70" />
+                </div>
+              )}
             </Card>
           ))}
         </div>
