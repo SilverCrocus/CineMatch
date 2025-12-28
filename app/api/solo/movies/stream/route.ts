@@ -77,12 +77,21 @@ export async function GET(request: NextRequest) {
       };
 
       try {
-        // Get user's existing watchlist to exclude
-        const existing = await queryMany<{ movie_id: number }>(
-          "SELECT movie_id FROM solo_watchlist WHERE user_id = $1",
-          [session.user.id]
-        );
-        const existingIds = new Set(existing.map((e) => e.movie_id));
+        // Get user's watchlist AND dismissed movies to exclude
+        const [watchlist, dismissed] = await Promise.all([
+          queryMany<{ movie_id: number }>(
+            "SELECT movie_id FROM solo_watchlist WHERE user_id = $1",
+            [session.user.id]
+          ),
+          queryMany<{ movie_id: number }>(
+            "SELECT movie_id FROM solo_dismissed WHERE user_id = $1",
+            [session.user.id]
+          ),
+        ]);
+        const existingIds = new Set([
+          ...watchlist.map((e) => e.movie_id),
+          ...dismissed.map((e) => e.movie_id),
+        ]);
 
         // Get TMDB movie IDs based on source
         let tmdbIds: number[] = [];
