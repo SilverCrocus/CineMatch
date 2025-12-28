@@ -7,22 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import type { Movie } from "@/types";
 
-// Build best-effort Rotten Tomatoes slug from movie title
-function buildRTSlug(title: string, year?: number): string {
-  let slug = title
-    .toLowerCase()
-    .replace(/['']/g, "")           // Remove apostrophes
-    .replace(/[^a-z0-9\s]/g, "")    // Remove special chars
-    .replace(/\s+/g, "_")           // Spaces to underscores
-    .replace(/_+/g, "_")            // Collapse multiple underscores
-    .replace(/^_|_$/g, "");         // Trim underscores
-
-  // Add year suffix if provided (helps disambiguate remakes)
-  if (year && year >= 2000) {
-    slug = `${slug}_${year}`;
-  }
-
-  return slug;
+// Build Rotten Tomatoes search URL (reliable fallback since RT slugs are unpredictable)
+function buildRTSearchUrl(title: string): string {
+  return `https://www.rottentomatoes.com/search?search=${encodeURIComponent(title)}`;
 }
 
 function SoloSwipeContent() {
@@ -219,7 +206,7 @@ function SoloSwipeContent() {
                       {/* RT Score/Link */}
                       {currentMovie.rtCriticScore && (
                         <a
-                          href={`https://www.rottentomatoes.com/m/${buildRTSlug(currentMovie.title, currentMovie.year)}`}
+                          href={buildRTSearchUrl(currentMovie.title)}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={handleLinkClick}
