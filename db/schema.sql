@@ -106,3 +106,15 @@ CREATE INDEX idx_cached_movies_tmdb_id ON cached_movies(tmdb_id);
 CREATE INDEX idx_watched_movies_watched_by ON watched_movies USING GIN(watched_by);
 CREATE INDEX idx_solo_watchlist_user_id ON solo_watchlist(user_id);
 CREATE INDEX idx_solo_watchlist_movie_id ON solo_watchlist(movie_id);
+
+-- Solo mode dismissed movies (swiped left)
+CREATE TABLE solo_dismissed (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  movie_id INTEGER NOT NULL,
+  dismissed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, movie_id)
+);
+
+CREATE INDEX idx_solo_dismissed_user_id ON solo_dismissed(user_id);
+CREATE INDEX idx_solo_dismissed_movie_id ON solo_dismissed(movie_id);
