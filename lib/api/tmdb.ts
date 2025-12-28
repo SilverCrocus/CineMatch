@@ -82,6 +82,7 @@ async function tmdbFetch<T>(endpoint: string, params?: Record<string, string>): 
 
 export async function discoverMovies(filters: {
   genres?: number[];
+  genreMatch?: "any" | "all";
   yearFrom?: number;
   yearTo?: number;
   page?: number;
@@ -94,7 +95,9 @@ export async function discoverMovies(filters: {
   };
 
   if (filters.genres?.length) {
-    params.with_genres = filters.genres.join(",");
+    // TMDB: comma = AND, pipe = OR
+    const separator = filters.genreMatch === "all" ? "," : "|";
+    params.with_genres = filters.genres.join(separator);
   }
   if (filters.yearFrom) {
     params["primary_release_date.gte"] = `${filters.yearFrom}-01-01`;
