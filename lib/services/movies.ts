@@ -10,6 +10,7 @@ import {
   searchMovies,
 } from "@/lib/api/tmdb";
 import { getOMDbRatings } from "@/lib/api/omdb";
+import { getRTRatings } from "@/lib/api/rottentomatoes";
 import type { Movie } from "@/types";
 
 interface MovieFilters {
@@ -32,24 +33,45 @@ interface CachedMovieRow {
   runtime: number | null;
   imdb_rating: string | null;
   rt_critic_score: string | null;
+  rt_audience_score: string | null;
+  rt_url: string | null;
   streaming_services: string[];
   cached_at: string;
 }
 
+interface EnrichedRatings {
+  imdbRating: string | null;
+  rtCriticScore: string | null;
+  rtAudienceScore: string | null;
+  rtUrl: string | null;
+}
+
 async function enrichMovieWithRatings(
-  tmdbId: number,
   imdbId: string | null
-): Promise<{ imdbRating: string | null; rtCriticScore: string | null }> {
+): Promise<EnrichedRatings> {
   if (!imdbId) {
-    return { imdbRating: null, rtCriticScore: null };
+    return { imdbRating: null, rtCriticScore: null, rtAudienceScore: null, rtUrl: null };
   }
 
-  try {
-    return await getOMDbRatings(imdbId);
-  } catch (error) {
-    console.error(`Failed to fetch OMDb ratings for ${imdbId}:`, error);
-    return { imdbRating: null, rtCriticScore: null };
-  }
+  // Fetch from both APIs in parallel
+  const [omdbRatings, rtRatings] = await Promise.all([
+    getOMDbRatings(imdbId).catch((error) => {
+      console.error(`Failed to fetch OMDb ratings for ${imdbId}:`, error);
+      return { imdbRating: null, rtCriticScore: null };
+    }),
+    getRTRatings(imdbId).catch((error) => {
+      console.error(`Failed to fetch RT ratings for ${imdbId}:`, error);
+      return { criticScore: null, audienceScore: null, rtUrl: null };
+    }),
+  ]);
+
+  return {
+    imdbRating: omdbRatings.imdbRating,
+    // Prefer RT API scores over OMDb (more reliable)
+    rtCriticScore: rtRatings.criticScore || omdbRatings.rtCriticScore,
+    rtAudienceScore: rtRatings.audienceScore,
+    rtUrl: rtRatings.rtUrl,
+  };
 }
 
 async function tmdbToMovie(tmdbId: number): Promise<Movie | null> {
@@ -59,7 +81,7 @@ async function tmdbToMovie(tmdbId: number): Promise<Movie | null> {
       getWatchProviders(tmdbId),
     ]);
 
-    const ratings = await enrichMovieWithRatings(tmdbId, details.imdb_id);
+    const ratings = await enrichMovieWithRatings(details.imdb_id);
 
     return {
       id: `tmdb-${tmdbId}`,
@@ -74,6 +96,8 @@ async function tmdbToMovie(tmdbId: number): Promise<Movie | null> {
       runtime: details.runtime,
       imdbRating: ratings.imdbRating,
       rtCriticScore: ratings.rtCriticScore,
+      rtAudienceScore: ratings.rtAudienceScore,
+      rtUrl: ratings.rtUrl,
       streamingServices: providers,
     };
   } catch (error) {
@@ -108,6 +132,8 @@ export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
         runtime: cached.runtime,
         imdbRating: cached.imdb_rating,
         rtCriticScore: cached.rt_critic_score,
+        rtAudienceScore: cached.rt_audience_score,
+        rtUrl: cached.rt_url,
         streamingServices: cached.streaming_services,
       };
     }
@@ -120,10 +146,10 @@ export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
 
   // Cache the result
   await query(
-    `INSERT INTO cached_movies (tmdb_id, imdb_id, title, year, poster_url, backdrop_url, genres, synopsis, runtime, imdb_rating, rt_critic_score, streaming_services, cached_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+    `INSERT INTO cached_movies (tmdb_id, imdb_id, title, year, poster_url, backdrop_url, genres, synopsis, runtime, imdb_rating, rt_critic_score, rt_audience_score, rt_url, streaming_services, cached_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
      ON CONFLICT (tmdb_id)
-     DO UPDATE SET imdb_id = $2, title = $3, year = $4, poster_url = $5, backdrop_url = $6, genres = $7, synopsis = $8, runtime = $9, imdb_rating = $10, rt_critic_score = $11, streaming_services = $12, cached_at = NOW()`,
+     DO UPDATE SET imdb_id = $2, title = $3, year = $4, poster_url = $5, backdrop_url = $6, genres = $7, synopsis = $8, runtime = $9, imdb_rating = $10, rt_critic_score = $11, rt_audience_score = $12, rt_url = $13, streaming_services = $14, cached_at = NOW()`,
     [
       movie.tmdbId,
       movie.imdbId,
@@ -136,6 +162,8 @@ export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
       movie.runtime,
       movie.imdbRating,
       movie.rtCriticScore,
+      movie.rtAudienceScore,
+      movie.rtUrl,
       movie.streamingServices,
     ]
   );
@@ -234,6 +262,8 @@ export async function searchMoviesByTitle(searchQuery: string): Promise<Movie[]>
     runtime: null,
     imdbRating: null,
     rtCriticScore: null,
+    rtAudienceScore: null,
+    rtUrl: null,
     streamingServices: [],
   }));
 }

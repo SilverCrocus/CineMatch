@@ -19,6 +19,8 @@ export interface Movie {
   runtime: number | null;
   imdbRating: string | null;
   rtCriticScore: string | null;
+  rtAudienceScore: string | null;
+  rtUrl: string | null;
   streamingServices: string[];
 }
 
@@ -35,6 +37,8 @@ export interface CachedMovie {
   runtime: number | null;
   imdbRating: string | null;
   rtCriticScore: string | null;
+  rtAudienceScore: string | null;
+  rtUrl: string | null;
   streamingServices: string[];
   cachedAt?: string;
 }

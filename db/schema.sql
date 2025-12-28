@@ -23,7 +23,7 @@ CREATE TABLE friendships (
   UNIQUE(user_id, friend_id)
 );
 
--- Cached movies from TMDB/OMDb
+-- Cached movies from TMDB/OMDb/RT
 CREATE TABLE cached_movies (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tmdb_id INTEGER UNIQUE NOT NULL,
@@ -37,6 +37,8 @@ CREATE TABLE cached_movies (
   runtime INTEGER,
   imdb_rating VARCHAR(10),
   rt_critic_score VARCHAR(10),
+  rt_audience_score VARCHAR(10),
+  rt_url TEXT,
   streaming_services TEXT[] DEFAULT '{}',
   cached_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

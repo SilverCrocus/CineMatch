@@ -1,15 +1,20 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, X, Heart, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import type { Movie } from "@/types";
 
-// Build Rotten Tomatoes search URL (reliable fallback since RT slugs are unpredictable)
+// Build Rotten Tomatoes search URL as fallback when rtUrl is not available
 function buildRTSearchUrl(title: string): string {
   return `https://www.rottentomatoes.com/search?search=${encodeURIComponent(title)}`;
+}
+
+// Get the best RT URL - prefer direct URL from API, fallback to search
+function getRTUrl(movie: Movie): string {
+  return movie.rtUrl || buildRTSearchUrl(movie.title);
 }
 
 function SoloSwipeContent() {
@@ -17,26 +22,63 @@ function SoloSwipeContent() {
   const searchParams = useSearchParams();
   const source = searchParams.get("source") || "random";
   const genre = searchParams.get("genre");
-  const movie = searchParams.get("movie");
+  const movieParam = searchParams.get("movie");
 
   const [movies, setMovies] = useState<Movie[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [savedCount, setSavedCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
+  const moviesRef = useRef<Movie[]>([]);
 
   useEffect(() => {
     const params = new URLSearchParams({ source });
     if (genre) params.set("genre", genre);
-    if (movie) params.set("movie", movie);
+    if (movieParam) params.set("movie", movieParam);
 
-    fetch(`/api/solo/movies?${params}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setMovies(data.movies || []);
+    // Use SSE streaming endpoint
+    const eventSource = new EventSource(`/api/solo/movies/stream?${params}`);
+
+    eventSource.addEventListener("movie", (event) => {
+      const movie: Movie = JSON.parse(event.data);
+      moviesRef.current = [...moviesRef.current, movie];
+      setMovies([...moviesRef.current]);
+      setLoading(false); // Stop loading as soon as first movie arrives
+    });
+
+    eventSource.addEventListener("rt:update", (event) => {
+      const rtData = JSON.parse(event.data);
+      // Update the movie with RT data
+      moviesRef.current = moviesRef.current.map((m) =>
+        m.imdbId === rtData.imdbId
+          ? {
+              ...m,
+              rtCriticScore: rtData.rtCriticScore || m.rtCriticScore,
+              rtAudienceScore: rtData.rtAudienceScore,
+              rtUrl: rtData.rtUrl,
+            }
+          : m
+      );
+      setMovies([...moviesRef.current]);
+    });
+
+    eventSource.addEventListener("done", () => {
+      eventSource.close();
+    });
+
+    eventSource.addEventListener("error", () => {
+      eventSource.close();
+      // If no movies loaded, show error state
+      if (moviesRef.current.length === 0) {
         setLoading(false);
-      });
-  }, [source, genre, movie]);
+      }
+    });
+
+    return () => {
+      eventSource.close();
+      moviesRef.current = [];
+    };
+  }, [source, genre, movieParam]);
 
   const currentMovie = movies[currentIndex];
 
@@ -203,10 +245,10 @@ function SoloSwipeContent() {
                         </a>
                       )}
 
-                      {/* RT Score/Link */}
+                      {/* RT Critic Score/Link */}
                       {currentMovie.rtCriticScore && (
                         <a
-                          href={buildRTSearchUrl(currentMovie.title)}
+                          href={getRTUrl(currentMovie)}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={handleLinkClick}
@@ -215,6 +257,22 @@ function SoloSwipeContent() {
                           <span className="text-sm">🍅</span>
                           <span className="text-red-400 text-xs font-medium">
                             {currentMovie.rtCriticScore}
+                          </span>
+                        </a>
+                      )}
+
+                      {/* RT Audience Score */}
+                      {currentMovie.rtAudienceScore && (
+                        <a
+                          href={getRTUrl(currentMovie)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={handleLinkClick}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 rounded-full transition-colors"
+                        >
+                          <span className="text-sm">🍿</span>
+                          <span className="text-orange-400 text-xs font-medium">
+                            {currentMovie.rtAudienceScore}
                           </span>
                         </a>
                       )}

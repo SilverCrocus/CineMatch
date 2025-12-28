@@ -80,9 +80,30 @@ export default function MyListPage() {
                   <p className="text-white text-sm font-medium truncate">
                     {item.movie?.title}
                   </p>
+                  <p className="text-white/60 text-xs mb-1">
+                    {item.movie?.year}
+                  </p>
+                  {/* Scores */}
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    {item.movie?.imdbRating && (
+                      <span className="text-yellow-400 text-xs">
+                        ⭐ {item.movie.imdbRating}
+                      </span>
+                    )}
+                    {item.movie?.rtCriticScore && (
+                      <span className="text-red-400 text-xs">
+                        🍅 {item.movie.rtCriticScore}
+                      </span>
+                    )}
+                    {item.movie?.rtAudienceScore && (
+                      <span className="text-orange-400 text-xs">
+                        🍿 {item.movie.rtAudienceScore}
+                      </span>
+                    )}
+                  </div>
                   <button
                     onClick={() => handleRemove(item.movieId)}
-                    className="mt-2 text-red-400 text-xs flex items-center gap-1 hover:text-red-300"
+                    className="text-red-400 text-xs flex items-center gap-1 hover:text-red-300"
                   >
                     <Trash2 className="h-3 w-3" />
                     Remove

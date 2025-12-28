@@ -87,8 +87,14 @@ export function SwipeCard({ movie, onSwipe, isTop }: SwipeCardProps) {
             )}
             {movie.rtCriticScore && (
               <div className="flex items-center gap-1.5">
-                <span className="text-red-500 text-xs font-bold">🍅</span>
+                <span className="text-sm">🍅</span>
                 <span className="text-white text-sm">{movie.rtCriticScore}</span>
+              </div>
+            )}
+            {movie.rtAudienceScore && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm">🍿</span>
+                <span className="text-white text-sm">{movie.rtAudienceScore}</span>
               </div>
             )}
             {movie.runtime && (
