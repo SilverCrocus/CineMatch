@@ -98,8 +98,19 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const source = searchParams.get("source") || "random";
-  const genre = searchParams.get("genre");
+  const genresParam = searchParams.get("genres"); // comma-separated IDs
+  const genre = searchParams.get("genre"); // legacy single genre
   const movie = searchParams.get("movie");
+  const match = (searchParams.get("match") || "any") as "any" | "all";
+  const yearFrom = searchParams.get("yearFrom");
+  const yearTo = searchParams.get("yearTo");
+
+  // Parse genres - support both new multi-genre and legacy single genre
+  const genres: number[] = genresParam
+    ? genresParam.split(",").map((id) => parseInt(id)).filter((id) => !isNaN(id))
+    : genre
+    ? [parseInt(genre)]
+    : [];
 
   // Create SSE stream
   const encoder = new TextEncoder();
@@ -131,10 +142,16 @@ export async function GET(request: NextRequest) {
         const randomPages = pickRandomPages(3, 20);
         let tmdbIds: number[] = [];
 
-        if (source === "genre" && genre) {
+        if ((source === "genre" || source === "browse") && genres.length > 0) {
           const results = await Promise.all(
             randomPages.map((page) =>
-              discoverMovies({ genres: [parseInt(genre)], page })
+              discoverMovies({
+                genres,
+                genreMatch: match,
+                yearFrom: yearFrom ? parseInt(yearFrom) : undefined,
+                yearTo: yearTo ? parseInt(yearTo) : undefined,
+                page,
+              })
             )
           );
           tmdbIds = shuffle(results.flatMap((r) => r.movies.map((m) => m.id)));
@@ -156,7 +173,12 @@ export async function GET(request: NextRequest) {
 
             const results = await Promise.all(
               randomPages.map((page) =>
-                discoverMovies({ genres: genreIds.length > 0 ? genreIds : undefined, page })
+                discoverMovies({
+                  genres: genreIds.length > 0 ? genreIds : undefined,
+                  yearFrom: yearFrom ? parseInt(yearFrom) : undefined,
+                  yearTo: yearTo ? parseInt(yearTo) : undefined,
+                  page,
+                })
               )
             );
             tmdbIds = shuffle(results.flatMap((r) => r.movies.map((m) => m.id)));
