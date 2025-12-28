@@ -146,7 +146,11 @@ export async function GET(request: NextRequest) {
 
         // Phase 2: Stream RT data from batch API
         if (imdbIds.length > 0) {
+          console.log(`[RT Batch] Starting batch fetch for ${imdbIds.length} movies`);
+          let rtCount = 0;
           for await (const rtData of streamRTBatch(imdbIds)) {
+            rtCount++;
+            console.log(`[RT Batch] Received ${rtCount}: ${rtData.imdbId} - critic: ${rtData.criticScore}, audience: ${rtData.audienceScore}`);
             if (!rtData.error) {
               sendEvent("rt:update", {
                 imdbId: rtData.imdbId,
@@ -167,6 +171,7 @@ export async function GET(request: NextRequest) {
               }
             }
           }
+          console.log(`[RT Batch] Completed. Received ${rtCount} RT updates`);
         }
 
         // Done
