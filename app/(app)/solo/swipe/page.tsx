@@ -30,6 +30,9 @@ function SoloSwipeContent() {
   const [savedCount, setSavedCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const moviesRef = useRef<Movie[]>([]);
+  const [showUndoToast, setShowUndoToast] = useState(false);
+  const [lastDismissed, setLastDismissed] = useState<Movie | null>(null);
+  const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams({ source });
@@ -91,6 +94,13 @@ function SoloSwipeContent() {
     async (liked: boolean) => {
       if (!currentMovie) return;
 
+      // Clear any existing undo timeout
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current);
+        undoTimeoutRef.current = null;
+      }
+      setShowUndoToast(false);
+
       if (liked) {
         await fetch("/api/solo/list", {
           method: "POST",
@@ -98,12 +108,50 @@ function SoloSwipeContent() {
           body: JSON.stringify({ movieId: currentMovie.tmdbId }),
         });
         setSavedCount((prev) => prev + 1);
+        setLastDismissed(null);
+      } else {
+        // Track dismissed movie
+        await fetch("/api/solo/dismissed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ movieId: currentMovie.tmdbId }),
+        });
+
+        // Show undo toast
+        setLastDismissed(currentMovie);
+        setShowUndoToast(true);
+        undoTimeoutRef.current = setTimeout(() => {
+          setShowUndoToast(false);
+          setLastDismissed(null);
+        }, 3000);
       }
 
       setCurrentIndex((prev) => prev + 1);
     },
     [currentMovie]
   );
+
+  const handleUndo = useCallback(async () => {
+    if (!lastDismissed) return;
+
+    // Clear timeout
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+      undoTimeoutRef.current = null;
+    }
+
+    // Remove from dismissed
+    await fetch("/api/solo/dismissed", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ movieId: lastDismissed.tmdbId }),
+    });
+
+    // Go back to previous movie
+    setCurrentIndex((prev) => prev - 1);
+    setShowUndoToast(false);
+    setLastDismissed(null);
+  }, [lastDismissed]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -118,6 +166,15 @@ function SoloSwipeContent() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
+
+  // Cleanup undo timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const isDone = currentIndex >= movies.length;
 
@@ -312,6 +369,26 @@ function SoloSwipeContent() {
           </div>
         </>
       )}
+
+      {/* Undo Toast */}
+      <AnimatePresence>
+        {showUndoToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-4 py-2 rounded-full flex items-center gap-3 shadow-lg"
+          >
+            <span className="text-sm">Dismissed</span>
+            <button
+              onClick={handleUndo}
+              className="text-sm font-medium text-accent hover:underline"
+            >
+              Undo
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
