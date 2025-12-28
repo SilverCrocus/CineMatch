@@ -32,6 +32,24 @@ function passesRTFilter(movie: Movie): boolean {
   return score === null || score >= MIN_RT_AUDIENCE_SCORE;
 }
 
+// Randomization helpers for variety
+function pickRandomPages(count: number, maxPage: number): number[] {
+  const pages = new Set<number>();
+  while (pages.size < count) {
+    pages.add(Math.floor(Math.random() * maxPage) + 1);
+  }
+  return Array.from(pages);
+}
+
+function shuffle<T>(array: T[]): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 // Fetch movie without RT data (fast path)
 async function fetchMovieFast(tmdbId: number): Promise<Movie | null> {
   try {
@@ -109,14 +127,17 @@ export async function GET(request: NextRequest) {
         ]);
 
         // Get TMDB movie IDs based on source
+        // Pick 3 random pages from 1-20 for variety
+        const randomPages = pickRandomPages(3, 20);
         let tmdbIds: number[] = [];
 
         if (source === "genre" && genre) {
-          const { movies: tmdbMovies } = await discoverMovies({
-            genres: [parseInt(genre)],
-            page: 1,
-          });
-          tmdbIds = tmdbMovies.map((m) => m.id);
+          const results = await Promise.all(
+            randomPages.map((page) =>
+              discoverMovies({ genres: [parseInt(genre)], page })
+            )
+          );
+          tmdbIds = shuffle(results.flatMap((r) => r.movies.map((m) => m.id)));
         } else if (source === "similar" && movie) {
           const searchResults = await searchMovies(movie);
           if (searchResults.length > 0) {
@@ -133,16 +154,19 @@ export async function GET(request: NextRequest) {
               .map(([id]) => parseInt(id))
               .slice(0, 2);
 
-            const { movies: tmdbMovies } = await discoverMovies({
-              genres: genreIds.length > 0 ? genreIds : undefined,
-              page: 1,
-            });
-            tmdbIds = tmdbMovies.map((m) => m.id);
+            const results = await Promise.all(
+              randomPages.map((page) =>
+                discoverMovies({ genres: genreIds.length > 0 ? genreIds : undefined, page })
+              )
+            );
+            tmdbIds = shuffle(results.flatMap((r) => r.movies.map((m) => m.id)));
           }
         } else {
           // Random/surprise me
-          const { movies: tmdbMovies } = await discoverMovies({ page: 1 });
-          tmdbIds = tmdbMovies.map((m) => m.id);
+          const results = await Promise.all(
+            randomPages.map((page) => discoverMovies({ page }))
+          );
+          tmdbIds = shuffle(results.flatMap((r) => r.movies.map((m) => m.id)));
         }
 
         // Filter out existing watchlist items and limit to 30
