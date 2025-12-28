@@ -148,8 +148,10 @@ export function getGenreNames(genreIds: number[]): string[] {
   return genreIds.map((id) => GENRE_MAP[id]).filter(Boolean);
 }
 
-export function getYear(releaseDate: string): number {
-  return new Date(releaseDate).getFullYear();
+export function getYear(releaseDate: string): number | null {
+  if (!releaseDate) return null;
+  const year = new Date(releaseDate).getFullYear();
+  return isNaN(year) ? null : year;
 }
 
 export { GENRE_MAP };

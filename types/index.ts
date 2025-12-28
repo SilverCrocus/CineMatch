@@ -11,7 +11,7 @@ export interface Movie {
   tmdbId: number;
   imdbId: string | null;
   title: string;
-  year: number;
+  year: number | null;
   posterUrl: string | null;
   backdropUrl: string | null;
   genres: string[];
@@ -29,7 +29,7 @@ export interface CachedMovie {
   tmdbId: number;
   imdbId: string | null;
   title: string;
-  year: number;
+  year: number | null;
   posterUrl: string | null;
   backdropUrl: string | null;
   genres: string[];
