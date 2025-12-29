@@ -126,9 +126,12 @@ describe('Session API', () => {
 
   describe('api.getPrematches', () => {
     it('should GET /api/sessions/:id/prematches', async () => {
+      // API returns prematches array with movie objects
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ movies: [{ id: 1, title: 'Common Movie' }] }),
+        json: () => Promise.resolve({
+          prematches: [{ movie: { id: 1, title: 'Common Movie' } }]
+        }),
       } as Response);
 
       const result = await api.getPrematches('session-123');
@@ -137,6 +140,7 @@ describe('Session API', () => {
         `${API_BASE_URL}/api/sessions/session-123/prematches`,
         expect.any(Object)
       );
+      // getPrematches transforms the response
       expect(result).toEqual({ movies: [{ id: 1, title: 'Common Movie' }] });
     });
   });

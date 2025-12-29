@@ -40,3 +40,7 @@ yarn-error.*
 /ios
 /android
 .worktrees/
+# Screenshots
+*.png
+emulator-screenshot*.png
+session-lobby.png

@@ -1,0 +1,59 @@
+# Home Page: Join Session Flow
+# Tests joining an existing session using the home page "Join Session" feature
+#
+# Prerequisites:
+# - A session must exist with the room code passed via ROOM_CODE env var
+# - Run with: maestro test .maestro/05-home-join-session.yaml --env ROOM_CODE=ABCD
+#
+# This test:
+# 1. Opens the app and navigates to home
+# 2. Enters the room code in the "Join Session" input
+# 3. Taps the Join button
+# 4. Verifies we land in the session lobby
+
+appId: com.cinematch.app
+---
+
+# Launch the app fresh
+- launchApp
+
+# Handle login if needed
+- runFlow:
+    when:
+      visible: "Sign in with Google"
+    commands:
+      - tapOn: "Sign in with Google"
+      - extendedWaitUntil:
+          visible: "Welcome back.*"
+          timeout: 15000
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "Welcome back.*"
+    timeout: 15000
+
+# Verify home screen elements
+- assertVisible: "Join Session"
+- assertVisible: "Enter a room code to join"
+
+# Enter the room code (passed via environment variable)
+- tapOn: "CODE"
+- inputText: "${ROOM_CODE}"
+
+# Tap the Join button
+- tapOn: "Join"
+
+# Wait for session lobby to load
+- extendedWaitUntil:
+    visible: "Session Lobby"
+    timeout: 15000
+
+# Verify we're in the lobby
+- assertVisible: "Share the code with friends"
+- assertVisible: "Copy Code"
+
+# Verify at least 1 participant (the host who created the session)
+- assertVisible: "joined"
+
+# We should see "Waiting for host to start" since we joined as a guest
+- assertVisible: "Waiting for host"

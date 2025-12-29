@@ -1,5 +1,6 @@
 # My List Screen E2E Test
 # Tests the saved and dismissed movie lists functionality
+# Navigates through the swipe flow to access My List
 
 appId: com.cinematch.app
 ---
@@ -7,26 +8,49 @@ appId: com.cinematch.app
 # Launch the app fresh to ensure clean state
 - launchApp
 
-# First ensure we're on Home screen by tapping Home tab
+# First ensure we're logged in by checking for Welcome text
+- extendedWaitUntil:
+    visible: "Welcome back.*"
+    timeout: 10000
+
+# Tap the Discover tab (second tab, ~50% from left)
 - tapOn:
-    point: "17%,95%"
+    point: "50%,95%"
 - waitForAnimationToEnd
 
-# Wait for Home screen
+# Wait for Discover screen to load
 - extendedWaitUntil:
-    visible: "Welcome.*"
+    visible: "Discover"
     timeout: 5000
 
-# Tap My List button on Home screen
-- tapOn: "My List"
+# Tap "Surprise Me" to start swiping
+- tapOn: "Surprise Me"
 - waitForAnimationToEnd
 
-# Wait for list screen to load - look for Saved tab
+# Wait for movies to load - look for saved counter
 - extendedWaitUntil:
-    visible: "Saved.*"
-    timeout: 5000
+    visible: ".*saved"
+    timeout: 15000
 
-# Verify Dismissed tab is also visible
+# Save one movie by swiping right
+- swipe:
+    direction: RIGHT
+    duration: 500
+- waitForAnimationToEnd
+
+# Verify saved count increased
+- assertVisible: "1 saved"
+
+# Now use deep link to navigate directly to My List
+- openLink: "exp://127.0.0.1:8081/--/solo/list"
+
+# Wait for My List screen to load
+- extendedWaitUntil:
+    visible: "My List"
+    timeout: 10000
+
+# Verify tabs are visible
+- assertVisible: "Saved.*"
 - assertVisible: "Dismissed.*"
 
 # Test: Switch to Dismissed tab
@@ -37,13 +61,17 @@ appId: com.cinematch.app
 - tapOn: "Saved.*"
 - waitForAnimationToEnd
 
-# Test: Go back to Home by tapping the back arrow (paddingTop:60 + icon center ~12 = ~72pts from top)
+# Go back using back arrow (top left)
 - tapOn:
     point: "7%,8%"
 - waitForAnimationToEnd
+
+# Navigate back to Home tab
+- tapOn:
+    point: "17%,95%"
 - waitForAnimationToEnd
 
 # Verify we're back on home screen
 - extendedWaitUntil:
-    visible: "Welcome.*"
+    visible: "Welcome back.*"
     timeout: 5000

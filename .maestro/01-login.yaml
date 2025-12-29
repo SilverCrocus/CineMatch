@@ -8,26 +8,26 @@ appId: com.cinematch.app
 # Launch the app fresh to ensure clean state
 - launchApp
 
-# Check if already logged in (Home screen visible)
+# Check if already logged in (Home screen visible with new UI)
 - runFlow:
     when:
-      visible: "Welcome.*"
+      visible: "Welcome back.*"
     commands:
       # Already logged in - verify home screen elements
-      - assertVisible: "Start Swiping"
-      - assertVisible: "My List"
-      - assertVisible: "Sign Out"
-      # Verify tab bar exists by tapping Discover
+      - assertVisible: "New Session"
+      - assertVisible: "Create Session"
+      - assertVisible: "Join Session"
+      # Verify tab bar exists by tapping Solo tab
       - tapOn:
           point: "50%,95%"
       - extendedWaitUntil:
-          visible: "Discover"
+          visible: "Solo Mode"
           timeout: 3000
-      # Go back to Home
+      # Go back to Home tab
       - tapOn:
           point: "17%,95%"
       - extendedWaitUntil:
-          visible: "Welcome.*"
+          visible: "Welcome back.*"
           timeout: 3000
 
 # If on login screen, perform login
@@ -38,6 +38,7 @@ appId: com.cinematch.app
       - assertVisible: "Cinematch"
       - tapOn: "Sign in with Google"
       - extendedWaitUntil:
-          visible: "Welcome.*"
+          visible: "Welcome back.*"
           timeout: 10000
-      - assertVisible: "Start Swiping"
+      - assertVisible: "New Session"
+      - assertVisible: "Join Session"

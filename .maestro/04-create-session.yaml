@@ -1,0 +1,57 @@
+# Create Session Flow Test
+# Tests creating a new group session with genre filters
+
+appId: com.cinematch.app
+---
+
+# Launch the app fresh
+- launchApp
+
+# Check if already logged in or on login screen
+- runFlow:
+    when:
+      visible: "Sign in with Google"
+    commands:
+      # On login screen, perform login
+      - tapOn: "Sign in with Google"
+      - extendedWaitUntil:
+          visible: "Welcome back.*"
+          timeout: 15000
+
+# Wait for home screen (user should now be logged in)
+- extendedWaitUntil:
+    visible: "Welcome back.*"
+    timeout: 15000
+
+# Wait for UI to settle
+- waitForAnimationToEnd
+
+# Tap on "Create Session" button in the hero card
+# Button is roughly centered horizontally, about 50% down the screen
+- tapOn:
+    point: "50%,50%"
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Tap on Action genre badge (first row, first badge)
+- tapOn:
+    point: "20%,38%"
+- waitForAnimationToEnd
+
+# Tap on Comedy genre badge (first row, second badge)
+- tapOn:
+    point: "45%,38%"
+- waitForAnimationToEnd
+
+# Tap Create Session button at bottom of screen
+- tapOn:
+    point: "50%,93%"
+- waitForAnimationToEnd
+
+# Wait for session creation to complete
+- extendedWaitUntil:
+    visible: ".*joined"
+    timeout: 30000
+
+# Take screenshot to verify we're in lobby
+- takeScreenshot: session-lobby

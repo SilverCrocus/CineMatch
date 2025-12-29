@@ -1,0 +1,24 @@
+# Verify Lobby Participants
+# This test verifies that the lobby shows 2 participants after a bot joins
+#
+# Run this after the bot has been added to the session via API
+# The app should already be on the session lobby screen
+
+appId: com.cinematch.app
+---
+
+# Don't relaunch - app should already be on lobby screen
+# Just wait a moment for the UI to update with the new participant
+- wait: 2000
+
+# Verify we're still in the lobby
+- assertVisible: "Session Lobby"
+
+# Verify 2 participants are shown
+- assertVisible: "2 joined"
+
+# Verify the bot participant is visible
+- assertVisible: "Test Bot"
+
+# The lobby should still show the room code
+- assertVisible: "Copy Code"

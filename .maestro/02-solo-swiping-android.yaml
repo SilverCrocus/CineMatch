@@ -7,17 +7,22 @@ appId: com.cinematch.app
 # Launch the app fresh to ensure clean state
 - launchApp
 
-# First ensure we're on Home screen
+# First ensure we're logged in by checking for Welcome text
+- extendedWaitUntil:
+    visible: "Welcome back.*"
+    timeout: 10000
+
+# Tap the Discover tab (second tab, ~50% from left)
 - tapOn:
-    point: "17%,95%"
+    point: "50%,95%"
 - waitForAnimationToEnd
 
-# Tap "Start Swiping" button
-- tapOn: "Start Swiping"
-- waitForAnimationToEnd
-- waitForAnimationToEnd
+# Wait for Discover screen to load
+- extendedWaitUntil:
+    visible: "Discover"
+    timeout: 5000
 
-# Now on Solo Mode menu - tap "Surprise Me" using text (works on Android)
+# Tap "Surprise Me" card to start random swiping (using subtitle text for Android)
 - tapOn: "Random popular movies"
 - waitForAnimationToEnd
 - waitForAnimationToEnd
@@ -50,7 +55,7 @@ appId: com.cinematch.app
     duration: 500
 - waitForAnimationToEnd
 
-# Go back to Solo Mode menu (tap back arrow at top left)
+# Go back using back button (top left)
 - tapOn:
     point: "8%,10%"
 - waitForAnimationToEnd
@@ -60,3 +65,8 @@ appId: com.cinematch.app
 - tapOn:
     point: "17%,95%"
 - waitForAnimationToEnd
+
+# Verify we're back on home screen
+- extendedWaitUntil:
+    visible: "Welcome back.*"
+    timeout: 5000
