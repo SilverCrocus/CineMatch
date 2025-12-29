@@ -40,7 +40,8 @@ yarn-error.*
 /ios
 /android
 .worktrees/
-# Screenshots
-*.png
-emulator-screenshot*.png
-session-lobby.png
+# Screenshots (root directory only, not assets)
+/emulator-screenshot*.png
+/session-lobby.png
+/*.png
+!/assets/**/*.png
