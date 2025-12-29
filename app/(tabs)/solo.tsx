@@ -1,109 +1,292 @@
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Modal,
+} from 'react-native';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import SwipeDeck from '../../components/SwipeDeck';
-import { api } from '../../lib/api';
-import { Movie } from '../../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { GENRES, YEAR_PRESETS } from '../../lib/genres';
 
-export default function SoloScreen() {
-  const queryClient = useQueryClient();
-  const [currentMovies, setCurrentMovies] = useState<Movie[]>([]);
+type Mode = 'menu' | 'similar-search' | 'genre-select';
 
-  const { isLoading, error, refetch } = useQuery({
-    queryKey: ['movies'],
-    queryFn: async () => {
-      const data = await api.getMovies();
-      setCurrentMovies((prev) => [...prev, ...data.movies]);
-      return data;
-    },
-  });
+export default function SoloModeScreen() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const [mode, setMode] = useState<Mode>('menu');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const likeMutation = useMutation({
-    mutationFn: api.likeMovie,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myList'] });
-    },
-  });
+  // Genre filter state
+  const [selectedGenres, setSelectedGenres] = useState<number[]>([]);
+  const [matchMode, setMatchMode] = useState<'any' | 'all'>('any');
+  const [yearPreset, setYearPreset] = useState<string>('any');
 
-  const dismissMutation = useMutation({
-    mutationFn: api.dismissMovie,
-  });
-
-  const handleSwipeRight = (movie: Movie) => {
-    likeMutation.mutate(movie.id);
-    setCurrentMovies((prev) => prev.filter((m) => m.id !== movie.id));
-
-    // Fetch more if running low
-    if (currentMovies.length < 5) {
-      refetch();
-    }
+  const handleSimilarSearch = () => {
+    if (!searchQuery.trim()) return;
+    router.push({
+      pathname: '/solo/swipe',
+      params: { source: 'similar', movie: searchQuery.trim() },
+    });
   };
 
-  const handleSwipeLeft = (movie: Movie) => {
-    dismissMutation.mutate(movie.id);
-    setCurrentMovies((prev) => prev.filter((m) => m.id !== movie.id));
-
-    // Fetch more if running low
-    if (currentMovies.length < 5) {
-      refetch();
-    }
+  const handleSurpriseMe = () => {
+    router.push({
+      pathname: '/solo/swipe',
+      params: { source: 'random' },
+    });
   };
 
-  if (isLoading && currentMovies.length === 0) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#e50914" />
-      </View>
+  const toggleGenre = (genreId: number) => {
+    setSelectedGenres((prev) =>
+      prev.includes(genreId)
+        ? prev.filter((id) => id !== genreId)
+        : [...prev, genreId]
     );
-  }
+  };
 
-  if (error && currentMovies.length === 0) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>Failed to load movies</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const handleStartBrowse = () => {
+    if (selectedGenres.length === 0) return;
 
-  if (currentMovies.length === 0) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.emptyText}>No more movies!</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
-          <Text style={styles.retryText}>Load More</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+    const params: Record<string, string> = {
+      source: 'browse',
+      genres: selectedGenres.join(','),
+      match: matchMode,
+    };
+
+    // Add year params based on preset
+    if (yearPreset !== 'any') {
+      const preset = YEAR_PRESETS.find((p) => p.value === yearPreset);
+      if (preset?.from) params.yearFrom = String(preset.from);
+      if (preset?.to) params.yearTo = String(preset.to);
+    }
+
+    router.push({
+      pathname: '/solo/swipe',
+      params,
+    });
+  };
+
+  const handleBackToMenu = () => {
+    setMode('menu');
+    setSelectedGenres([]);
+    setYearPreset('any');
+    setMatchMode('any');
+    setSearchQuery('');
+  };
 
   return (
-    <View style={styles.container}>
-      <SwipeDeck
-        movies={currentMovies}
-        onSwipeRight={handleSwipeRight}
-        onSwipeLeft={handleSwipeLeft}
-      />
-
-      {/* Action buttons */}
-      <View style={styles.buttons}>
-        <TouchableOpacity
-          style={[styles.button, styles.dismissButton]}
-          onPress={() => handleSwipeLeft(currentMovies[0])}
-        >
-          <Ionicons name="close" size={32} color="#f87171" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.button, styles.likeButton]}
-          onPress={() => handleSwipeRight(currentMovies[0])}
-        >
-          <Ionicons name="heart" size={32} color="#4ade80" />
-        </TouchableOpacity>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        {mode !== 'menu' && (
+          <TouchableOpacity onPress={handleBackToMenu} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        )}
+        <Text style={styles.headerTitle}>
+          {mode === 'menu' && 'Discover'}
+          {mode === 'similar-search' && 'Find Similar'}
+          {mode === 'genre-select' && 'Browse Movies'}
+        </Text>
       </View>
+
+      {mode === 'menu' && (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Similar to... */}
+          <TouchableOpacity
+            style={styles.menuCard}
+            onPress={() => setMode('similar-search')}
+          >
+            <View style={styles.menuIcon}>
+              <Ionicons name="search" size={24} color="#e50914" />
+            </View>
+            <View style={styles.menuText}>
+              <Text style={styles.menuTitle}>Similar to...</Text>
+              <Text style={styles.menuSubtitle}>Find movies like one you love</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+
+          {/* By Genre */}
+          <TouchableOpacity
+            style={styles.menuCard}
+            onPress={() => setMode('genre-select')}
+          >
+            <View style={styles.menuIcon}>
+              <Ionicons name="film" size={24} color="#e50914" />
+            </View>
+            <View style={styles.menuText}>
+              <Text style={styles.menuTitle}>By Genre</Text>
+              <Text style={styles.menuSubtitle}>Browse movies by category</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+
+          {/* Surprise Me */}
+          <TouchableOpacity style={styles.menuCard} onPress={handleSurpriseMe}>
+            <View style={styles.menuIcon}>
+              <Ionicons name="shuffle" size={24} color="#e50914" />
+            </View>
+            <View style={styles.menuText}>
+              <Text style={styles.menuTitle}>Surprise Me</Text>
+              <Text style={styles.menuSubtitle}>Random popular movies</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {mode === 'similar-search' && (
+        <View style={styles.content}>
+          <Text style={styles.instruction}>
+            Enter a movie you like and we'll find similar ones
+          </Text>
+          <View style={styles.searchRow}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="e.g. Inception"
+              placeholderTextColor="#666"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={handleSimilarSearch}
+              returnKeyType="search"
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[
+                styles.goButton,
+                !searchQuery.trim() && styles.goButtonDisabled,
+              ]}
+              onPress={handleSimilarSearch}
+              disabled={!searchQuery.trim()}
+            >
+              <Text style={styles.goButtonText}>Go</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {mode === 'genre-select' && (
+        <View style={styles.flex}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.genreContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Genre Selection */}
+            <Text style={styles.sectionLabel}>Select genres</Text>
+            <View style={styles.genreGrid}>
+              {GENRES.map((genre) => (
+                <TouchableOpacity
+                  key={genre.id}
+                  style={[
+                    styles.genreChip,
+                    selectedGenres.includes(genre.id) && styles.genreChipSelected,
+                  ]}
+                  onPress={() => toggleGenre(genre.id)}
+                >
+                  <Text
+                    style={[
+                      styles.genreChipText,
+                      selectedGenres.includes(genre.id) && styles.genreChipTextSelected,
+                    ]}
+                  >
+                    {genre.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Match Mode Toggle */}
+            {selectedGenres.length > 1 && (
+              <>
+                <Text style={styles.sectionLabel}>Match mode</Text>
+                <View style={styles.toggleContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      matchMode === 'any' && styles.toggleButtonActive,
+                    ]}
+                    onPress={() => setMatchMode('any')}
+                  >
+                    <Text
+                      style={[
+                        styles.toggleButtonText,
+                        matchMode === 'any' && styles.toggleButtonTextActive,
+                      ]}
+                    >
+                      Any genre
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      matchMode === 'all' && styles.toggleButtonActive,
+                    ]}
+                    onPress={() => setMatchMode('all')}
+                  >
+                    <Text
+                      style={[
+                        styles.toggleButtonText,
+                        matchMode === 'all' && styles.toggleButtonTextActive,
+                      ]}
+                    >
+                      All genres
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* Year Presets */}
+            <Text style={styles.sectionLabel}>Era</Text>
+            <View style={styles.yearGrid}>
+              {YEAR_PRESETS.map((preset) => (
+                <TouchableOpacity
+                  key={preset.value}
+                  style={[
+                    styles.yearChip,
+                    yearPreset === preset.value && styles.yearChipSelected,
+                  ]}
+                  onPress={() => setYearPreset(preset.value)}
+                >
+                  <Text
+                    style={[
+                      styles.yearChipText,
+                      yearPreset === preset.value && styles.yearChipTextSelected,
+                    ]}
+                  >
+                    {preset.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
+          {/* Fixed Start Button */}
+          <View style={[styles.startButtonContainer, { paddingBottom: insets.bottom + 80 }]}>
+            <TouchableOpacity
+              style={[
+                styles.startButton,
+                selectedGenres.length === 0 && styles.startButtonDisabled,
+              ]}
+              onPress={handleStartBrowse}
+              disabled={selectedGenres.length === 0}
+            >
+              <Text style={styles.startButtonText}>
+                {selectedGenres.length === 0
+                  ? 'Select at least one genre'
+                  : `Start Swiping (${selectedGenres.length} genre${selectedGenres.length > 1 ? 's' : ''})`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -113,50 +296,198 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f0f0f',
   },
-  centered: {
+  flex: {
     flex: 1,
-    backgroundColor: '#0f0f0f',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  backButton: {
+    marginRight: 12,
+  },
+  headerTitle: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  genreContent: {
+    paddingBottom: 100,
+  },
+  menuCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  menuIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(229, 9, 20, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
-  errorText: {
-    color: '#f87171',
-    fontSize: 16,
-    marginBottom: 16,
+  menuText: {
+    flex: 1,
   },
-  emptyText: {
-    color: '#888',
-    fontSize: 18,
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#e50914',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryText: {
+  menuTitle: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  menuSubtitle: {
+    color: '#888',
+    fontSize: 14,
+  },
+  instruction: {
+    color: '#888',
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: '#fff',
+    fontSize: 16,
+  },
+  goButton: {
+    backgroundColor: '#e50914',
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+  },
+  goButtonDisabled: {
+    backgroundColor: '#333',
+  },
+  goButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
-  buttons: {
+  sectionLabel: {
+    color: '#888',
+    fontSize: 14,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  genreGrid: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 32,
-    paddingBottom: 32,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
   },
-  button: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
+  genreChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  genreChipSelected: {
+    backgroundColor: '#e50914',
+    borderColor: '#e50914',
+  },
+  genreChipText: {
+    color: '#888',
+    fontSize: 14,
+  },
+  genreChipTextSelected: {
+    color: '#fff',
+    fontWeight: '500',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 16,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 6,
     alignItems: 'center',
-    borderWidth: 2,
   },
-  dismissButton: {
-    borderColor: '#f87171',
+  toggleButtonActive: {
+    backgroundColor: '#0f0f0f',
   },
-  likeButton: {
-    borderColor: '#4ade80',
+  toggleButtonText: {
+    color: '#666',
+    fontSize: 14,
+  },
+  toggleButtonTextActive: {
+    color: '#fff',
+    fontWeight: '500',
+  },
+  yearGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  yearChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  yearChipSelected: {
+    backgroundColor: '#e50914',
+    borderColor: '#e50914',
+  },
+  yearChipText: {
+    color: '#888',
+    fontSize: 14,
+  },
+  yearChipTextSelected: {
+    color: '#fff',
+    fontWeight: '500',
+  },
+  startButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    backgroundColor: '#0f0f0f',
+    borderTopWidth: 1,
+    borderTopColor: '#222',
+  },
+  startButton: {
+    backgroundColor: '#e50914',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  startButtonDisabled: {
+    backgroundColor: '#333',
+  },
+  startButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -1,0 +1,43 @@
+# Login Flow Test
+# Tests the authentication flow for Cinematch mobile app
+# Handles both logged-in and logged-out states
+
+appId: com.cinematch.app
+---
+
+# Launch the app fresh to ensure clean state
+- launchApp
+
+# Check if already logged in (Home screen visible)
+- runFlow:
+    when:
+      visible: "Welcome.*"
+    commands:
+      # Already logged in - verify home screen elements
+      - assertVisible: "Start Swiping"
+      - assertVisible: "My List"
+      - assertVisible: "Sign Out"
+      # Verify tab bar exists by tapping Discover
+      - tapOn:
+          point: "50%,95%"
+      - extendedWaitUntil:
+          visible: "Discover"
+          timeout: 3000
+      # Go back to Home
+      - tapOn:
+          point: "17%,95%"
+      - extendedWaitUntil:
+          visible: "Welcome.*"
+          timeout: 3000
+
+# If on login screen, perform login
+- runFlow:
+    when:
+      visible: "Sign in with Google"
+    commands:
+      - assertVisible: "Cinematch"
+      - tapOn: "Sign in with Google"
+      - extendedWaitUntil:
+          visible: "Welcome.*"
+          timeout: 10000
+      - assertVisible: "Start Swiping"

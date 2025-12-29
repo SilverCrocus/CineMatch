@@ -1,0 +1,63 @@
+# Solo Swiping Flow Test - iOS
+# Tests the movie discovery swiping functionality
+
+appId: com.cinematch.app
+---
+
+# Launch the app fresh to ensure clean state
+- launchApp
+
+# First ensure we're on Home screen
+- tapOn:
+    point: "17%,95%"
+- waitForAnimationToEnd
+
+# Tap "Start Swiping" button
+- tapOn: "Start Swiping"
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Now on Solo Mode menu - tap "Surprise Me" (iOS position: ~52%)
+- tapOn:
+    point: "50%,52%"
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Wait for movies to load - look for saved counter
+- extendedWaitUntil:
+    visible: ".*saved"
+    timeout: 15000
+
+# Test: Swipe right to like a movie
+- swipe:
+    direction: RIGHT
+    duration: 500
+- waitForAnimationToEnd
+
+# Test: Swipe left to dismiss a movie
+- swipe:
+    direction: LEFT
+    duration: 500
+- waitForAnimationToEnd
+
+# Continue with more swipes to verify stability
+- swipe:
+    direction: RIGHT
+    duration: 500
+- waitForAnimationToEnd
+
+- swipe:
+    direction: LEFT
+    duration: 500
+- waitForAnimationToEnd
+
+# Go back to Solo Mode menu (tap back arrow at top left)
+- tapOn:
+    point: "8%,10%"
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Navigate back to Home tab
+- tapOn:
+    point: "17%,95%"
+- waitForAnimationToEnd

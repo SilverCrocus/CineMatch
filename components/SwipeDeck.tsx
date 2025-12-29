@@ -1,15 +1,19 @@
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
+  useAnimatedStyle,
   withSpring,
+  withTiming,
   runOnJS,
+  interpolate,
 } from 'react-native-reanimated';
+import { useState } from 'react';
 import MovieCard from './MovieCard';
 import { Movie } from '../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
 
 interface SwipeDeckProps {
   movies: Movie[];
@@ -23,6 +27,23 @@ export default function SwipeDeck({
   onSwipeLeft,
 }: SwipeDeckProps) {
   const translateX = useSharedValue(0);
+  const isAnimating = useSharedValue(false);
+  const [cardDimensions, setCardDimensions] = useState({ width: 0, height: 0 });
+
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    // Calculate card size to fit within container with padding
+    const padding = 20;
+    const availableWidth = width - padding * 2;
+    const availableHeight = height - padding * 2;
+
+    // Use 90% of available width, and height that maintains aspect ratio or fits
+    const cardWidth = availableWidth * 0.95;
+    const idealHeight = cardWidth * 1.5; // Poster aspect ratio
+    const cardHeight = Math.min(idealHeight, availableHeight * 0.95);
+
+    setCardDimensions({ width: cardWidth, height: cardHeight });
+  };
 
   const handleSwipeComplete = (direction: 'left' | 'right') => {
     const movie = movies[0];
@@ -36,40 +57,74 @@ export default function SwipeDeck({
   };
 
   const panGesture = Gesture.Pan()
+    .activeOffsetX([-10, 10]) // Require 10px movement before activating
+    .onStart(() => {
+      isAnimating.value = false;
+    })
     .onUpdate((event) => {
-      translateX.value = event.translationX;
+      if (!isAnimating.value) {
+        translateX.value = event.translationX;
+      }
     })
     .onEnd((event) => {
+      if (isAnimating.value) return;
+
       if (event.translationX > SWIPE_THRESHOLD) {
         // Swipe right - like
-        translateX.value = withSpring(SCREEN_WIDTH * 1.5, {}, () => {
+        isAnimating.value = true;
+        translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 300 }, () => {
           runOnJS(handleSwipeComplete)('right');
           translateX.value = 0;
+          isAnimating.value = false;
         });
       } else if (event.translationX < -SWIPE_THRESHOLD) {
         // Swipe left - dismiss
-        translateX.value = withSpring(-SCREEN_WIDTH * 1.5, {}, () => {
+        isAnimating.value = true;
+        translateX.value = withTiming(-SCREEN_WIDTH * 1.5, { duration: 300 }, () => {
           runOnJS(handleSwipeComplete)('left');
           translateX.value = 0;
+          isAnimating.value = false;
         });
       } else {
         // Return to center
-        translateX.value = withSpring(0);
+        translateX.value = withSpring(0, { damping: 15, stiffness: 150 });
       }
     });
 
   // Show top 3 cards
   const visibleMovies = movies.slice(0, 3);
 
+  // Animated style for the top card
+  const topCardStyle = useAnimatedStyle(() => {
+    const rotate = interpolate(
+      translateX.value,
+      [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+      [-15, 0, 15]
+    );
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { rotate: `${rotate}deg` },
+      ],
+    };
+  });
+
   return (
-    <View style={styles.container}>
-      {visibleMovies.map((movie, index) => {
+    <View style={styles.container} onLayout={handleLayout}>
+      {/* Only render cards once we have dimensions */}
+      {cardDimensions.width > 0 && visibleMovies.slice().reverse().map((movie, reverseIndex) => {
+        const index = visibleMovies.length - 1 - reverseIndex;
         const isTop = index === 0;
+
+        const cardWrapperStyle = {
+          width: cardDimensions.width,
+          height: cardDimensions.height,
+        };
 
         if (isTop) {
           return (
             <GestureDetector key={movie.id} gesture={panGesture}>
-              <Animated.View style={styles.cardContainer}>
+              <Animated.View style={[styles.cardWrapper, cardWrapperStyle, { zIndex: 10 }, topCardStyle]}>
                 <MovieCard
                   movie={movie}
                   index={index}
@@ -82,17 +137,35 @@ export default function SwipeDeck({
           );
         }
 
+        // Background cards - stacked behind
+        const stackOffset = index * 8;
+        const stackScale = 1 - index * 0.05;
+
         return (
-          <MovieCard
+          <View
             key={movie.id}
-            movie={movie}
-            index={index}
-            totalCards={visibleMovies.length}
-            translateX={translateX}
-            isTop={false}
-          />
+            style={[
+              styles.cardWrapper,
+              cardWrapperStyle,
+              {
+                zIndex: 10 - index,
+                transform: [
+                  { translateY: -stackOffset },
+                  { scale: stackScale },
+                ],
+              },
+            ]}
+          >
+            <MovieCard
+              movie={movie}
+              index={index}
+              totalCards={visibleMovies.length}
+              translateX={translateX}
+              isTop={false}
+            />
+          </View>
         );
-      }).reverse()}
+      })}
     </View>
   );
 }
@@ -103,7 +176,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardContainer: {
+  cardWrapper: {
     position: 'absolute',
   },
 });

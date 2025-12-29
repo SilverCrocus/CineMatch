@@ -4,6 +4,7 @@ export default function SoloLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="list" />
+      <Stack.Screen name="swipe" />
     </Stack>
   );
 }

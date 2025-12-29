@@ -1,0 +1,49 @@
+# My List Screen E2E Test
+# Tests the saved and dismissed movie lists functionality
+
+appId: com.cinematch.app
+---
+
+# Launch the app fresh to ensure clean state
+- launchApp
+
+# First ensure we're on Home screen by tapping Home tab
+- tapOn:
+    point: "17%,95%"
+- waitForAnimationToEnd
+
+# Wait for Home screen
+- extendedWaitUntil:
+    visible: "Welcome.*"
+    timeout: 5000
+
+# Tap My List button on Home screen
+- tapOn: "My List"
+- waitForAnimationToEnd
+
+# Wait for list screen to load - look for Saved tab
+- extendedWaitUntil:
+    visible: "Saved.*"
+    timeout: 5000
+
+# Verify Dismissed tab is also visible
+- assertVisible: "Dismissed.*"
+
+# Test: Switch to Dismissed tab
+- tapOn: "Dismissed.*"
+- waitForAnimationToEnd
+
+# Test: Switch back to Saved tab
+- tapOn: "Saved.*"
+- waitForAnimationToEnd
+
+# Test: Go back to Home by tapping the back arrow (paddingTop:60 + icon center ~12 = ~72pts from top)
+- tapOn:
+    point: "7%,8%"
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# Verify we're back on home screen
+- extendedWaitUntil:
+    visible: "Welcome.*"
+    timeout: 5000

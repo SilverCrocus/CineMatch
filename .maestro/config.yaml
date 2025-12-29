@@ -1,0 +1,10 @@
+# Maestro Configuration
+# https://maestro.mobile.dev/cli/flow-configuration
+
+# App ID for iOS
+appId: com.cinematch.app
+
+# Environment variables (can be overridden by CLI)
+env:
+  TEST_USER_EMAIL: test@example.com
+  TEST_USER_PASSWORD: testpassword123

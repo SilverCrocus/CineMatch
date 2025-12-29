@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
@@ -21,21 +21,36 @@ export default function LoginScreen() {
   // For now, use a simple dev login flow
   // TODO: Replace with proper Google OAuth configuration
   async function handleSignIn() {
+    Alert.alert('Debug', 'Button pressed! Attempting login...');
+    console.log('[LOGIN] Button pressed, starting sign in...');
+    console.log('[LOGIN] API_BASE_URL:', API_BASE_URL);
+
     try {
-      // Development: Call your test login endpoint
-      const response = await fetch(`${API_BASE_URL}/api/auth/test-login`, {
+      const url = `${API_BASE_URL}/api/auth/test-login`;
+      console.log('[LOGIN] Fetching:', url);
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'test@example.com' }),
+        body: JSON.stringify({ email: 'test-host@cinematch.test' }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      console.log('[LOGIN] Response status:', response.status);
+      const data = await response.json();
+      console.log('[LOGIN] Response data:', JSON.stringify(data, null, 2));
+
+      if (response.ok && data.token) {
+        console.log('[LOGIN] Token received, calling signIn...');
         await signIn(data.token, data.user);
+        console.log('[LOGIN] signIn complete, navigating to tabs...');
         router.replace('/(tabs)');
+      } else {
+        Alert.alert('Login Failed', data.error || 'Unknown error');
+        console.error('[LOGIN] Login failed:', data.error || 'Unknown error');
       }
-    } catch (error) {
-      console.error('Sign in error:', error);
+    } catch (error: any) {
+      Alert.alert('Error', `Sign in error: ${error.message || error}`);
+      console.error('[LOGIN] Sign in error:', error);
     }
   }
 
