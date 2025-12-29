@@ -1,6 +1,37 @@
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL, SECURE_STORE_KEYS } from './constants';
-import { Movie, Friend, Session, User } from '../types';
+import { Movie, Friend, User } from '../types';
+
+// Session types
+export interface SessionSource {
+  type: 'filters' | 'url' | 'text';
+  filters?: {
+    genres?: number[];
+    yearFrom?: number;
+    yearTo?: number;
+  };
+  url?: string;
+  textList?: string;
+}
+
+export interface SessionParticipant {
+  id: string;
+  odUserId: string;
+  nickname: string;
+  completed: boolean;
+  user: { id: string; name: string; image: string };
+}
+
+export interface Session {
+  id: string;
+  code: string;
+  status: 'lobby' | 'swiping' | 'revealed';
+  hostId: string;
+  participants: SessionParticipant[];
+  movies: Movie[];
+  userSwipes: Record<number, boolean>;
+  isHost: boolean;
+}
 
 class APIError extends Error {
   constructor(
@@ -127,11 +158,43 @@ export const api = {
     }),
 
   // Sessions
-  createSession: () => fetchAPI<Session>('/api/sessions', { method: 'POST' }),
+  createSession: (source: SessionSource) =>
+    fetchAPI<{ id: string; code: string }>('/api/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ source }),
+    }),
+
   joinSession: (code: string) =>
-    fetchAPI<Session>('/api/sessions/join', {
+    fetchAPI<{ sessionId: string }>('/api/sessions/join', {
       method: 'POST',
       body: JSON.stringify({ code }),
     }),
-  getSession: (id: string) => fetchAPI<Session>(`/api/sessions/${id}`),
+
+  getSession: (sessionId: string): Promise<Session> =>
+    fetchAPI<Session>(`/api/sessions/${sessionId}`),
+
+  startSession: (sessionId: string) =>
+    fetchAPI(`/api/sessions/${sessionId}/start`, {
+      method: 'POST',
+    }),
+
+  swipeInSession: (sessionId: string, movieId: number, liked: boolean) =>
+    fetchAPI(`/api/sessions/${sessionId}/swipe`, {
+      method: 'POST',
+      body: JSON.stringify({ movieId, liked }),
+    }),
+
+  revealMatches: async (sessionId: string) => {
+    await fetchAPI(`/api/sessions/${sessionId}/reveal`, { method: 'POST' });
+    return fetchAPI<{ matches: Movie[] }>(`/api/sessions/${sessionId}/reveal`);
+  },
+
+  getPrematches: (sessionId: string) =>
+    fetchAPI<{ movies: Movie[] }>(`/api/sessions/${sessionId}/prematches`),
+
+  selectMovie: (sessionId: string, movieId: number) =>
+    fetchAPI(`/api/sessions/${sessionId}/select`, {
+      method: 'POST',
+      body: JSON.stringify({ movieId }),
+    }),
 };

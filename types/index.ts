@@ -29,13 +29,7 @@ export interface User {
   image?: string;
 }
 
-export interface Session {
-  id: string;
-  code: string;
-  status: 'waiting' | 'active' | 'completed';
-  host_id: string;
-  created_at: string;
-}
+// Session type is now defined in lib/api.ts with full participant and movie data
 
 export interface Friend {
   id: string;
