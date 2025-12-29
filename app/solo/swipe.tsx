@@ -188,7 +188,7 @@ export default function SwipeScreen() {
   if ((isLoading || !data) && allMovies.length === 0) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#e50914" />
+        <ActivityIndicator size="large" color="#00b894" />
         <Text style={styles.loadingText}>Loading movies...</Text>
       </View>
     );
@@ -290,11 +290,11 @@ export default function SwipeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: '#0a0a0a',
   },
   centered: {
     flex: 1,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: '#0a0a0a',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#e50914',
+    backgroundColor: '#00b894',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   primaryButton: {
-    backgroundColor: '#e50914',
+    backgroundColor: '#00b894',
   },
   primaryButtonText: {
     color: '#fff',
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   undoButtonText: {
-    color: '#e50914',
+    color: '#00b894',
     fontSize: 14,
     fontWeight: '600',
   },

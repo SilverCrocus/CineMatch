@@ -224,7 +224,7 @@ export default function CreateSessionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: '#0a0a0a',
   },
   header: {
     flexDirection: 'row',
@@ -257,11 +257,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 12,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderRadius: 12,
   },
   tabActive: {
-    backgroundColor: '#e50914',
+    backgroundColor: '#00b894',
   },
   tabText: {
     color: '#888',
@@ -294,14 +294,14 @@ const styles = StyleSheet.create({
   genreChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#222',
   },
   genreChipSelected: {
-    backgroundColor: '#e50914',
-    borderColor: '#e50914',
+    backgroundColor: '#00b894',
+    borderColor: '#00b894',
   },
   genreChipText: {
     color: '#888',
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
   yearInput: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#222',
   },
   yearDash: {
     color: '#666',
@@ -338,24 +338,24 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   urlInput: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     color: '#fff',
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#222',
   },
   textInput: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     color: '#fff',
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#222',
     height: 200,
   },
   footer: {
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#222',
   },
   createButton: {
-    backgroundColor: '#e50914',
+    backgroundColor: '#00b894',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

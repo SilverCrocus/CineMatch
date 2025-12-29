@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { GENRES, YEAR_PRESETS } from '../../lib/genres';
+import { GENRES, YEAR_PRESETS, YEAR_OPTIONS } from '../../lib/genres';
 
 type Mode = 'menu' | 'similar-search' | 'genre-select';
 
@@ -25,6 +25,10 @@ export default function SoloModeScreen() {
   const [selectedGenres, setSelectedGenres] = useState<number[]>([]);
   const [matchMode, setMatchMode] = useState<'any' | 'all'>('any');
   const [yearPreset, setYearPreset] = useState<string>('any');
+
+  // Custom year state
+  const [customYearFrom, setCustomYearFrom] = useState<number>(1990);
+  const [customYearTo, setCustomYearTo] = useState<number>(new Date().getFullYear());
 
   const handleSimilarSearch = () => {
     if (!searchQuery.trim()) return;
@@ -59,7 +63,10 @@ export default function SoloModeScreen() {
     };
 
     // Add year params based on preset
-    if (yearPreset !== 'any') {
+    if (yearPreset === 'custom') {
+      params.yearFrom = String(customYearFrom);
+      params.yearTo = String(customYearTo);
+    } else if (yearPreset !== 'any') {
       const preset = YEAR_PRESETS.find((p) => p.value === yearPreset);
       if (preset?.from) params.yearFrom = String(preset.from);
       if (preset?.to) params.yearTo = String(preset.to);
@@ -83,16 +90,18 @@ export default function SoloModeScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        {mode !== 'menu' && (
-          <TouchableOpacity onPress={handleBackToMenu} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={mode === 'menu' ? () => router.back() : handleBackToMenu}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {mode === 'menu' && 'Discover'}
           {mode === 'similar-search' && 'Find Similar'}
           {mode === 'genre-select' && 'Browse Movies'}
         </Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       {mode === 'menu' && (
@@ -103,7 +112,7 @@ export default function SoloModeScreen() {
             onPress={() => setMode('similar-search')}
           >
             <View style={styles.menuIcon}>
-              <Ionicons name="search" size={24} color="#e50914" />
+              <Ionicons name="search" size={24} color="#00b894" />
             </View>
             <View style={styles.menuText}>
               <Text style={styles.menuTitle}>Similar to...</Text>
@@ -118,7 +127,7 @@ export default function SoloModeScreen() {
             onPress={() => setMode('genre-select')}
           >
             <View style={styles.menuIcon}>
-              <Ionicons name="film" size={24} color="#e50914" />
+              <Ionicons name="film" size={24} color="#00b894" />
             </View>
             <View style={styles.menuText}>
               <Text style={styles.menuTitle}>By Genre</Text>
@@ -130,11 +139,26 @@ export default function SoloModeScreen() {
           {/* Surprise Me */}
           <TouchableOpacity style={styles.menuCard} onPress={handleSurpriseMe}>
             <View style={styles.menuIcon}>
-              <Ionicons name="shuffle" size={24} color="#e50914" />
+              <Ionicons name="shuffle" size={24} color="#00b894" />
             </View>
             <View style={styles.menuText}>
               <Text style={styles.menuTitle}>Surprise Me</Text>
               <Text style={styles.menuSubtitle}>Random popular movies</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+
+          {/* My List */}
+          <TouchableOpacity
+            style={styles.menuCard}
+            onPress={() => router.push('/solo/list')}
+          >
+            <View style={styles.menuIcon}>
+              <Ionicons name="list" size={24} color="#00b894" />
+            </View>
+            <View style={styles.menuText}>
+              <Text style={styles.menuTitle}>My List</Text>
+              <Text style={styles.menuSubtitle}>View saved movies</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
@@ -266,6 +290,71 @@ export default function SoloModeScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            {/* Custom Year Picker */}
+            {yearPreset === 'custom' && (
+              <View style={styles.customYearContainer}>
+                <View style={styles.customYearPicker}>
+                  <Text style={styles.customYearLabel}>From</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.yearOptionsContainer}
+                  >
+                    {YEAR_OPTIONS.map((year) => (
+                      <TouchableOpacity
+                        key={`from-${year}`}
+                        style={[
+                          styles.yearOption,
+                          customYearFrom === year && styles.yearOptionSelected,
+                        ]}
+                        onPress={() => {
+                          setCustomYearFrom(year);
+                          if (year > customYearTo) setCustomYearTo(year);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.yearOptionText,
+                            customYearFrom === year && styles.yearOptionTextSelected,
+                          ]}
+                        >
+                          {year}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+                <View style={styles.customYearPicker}>
+                  <Text style={styles.customYearLabel}>To</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.yearOptionsContainer}
+                  >
+                    {YEAR_OPTIONS.filter((y) => y >= customYearFrom).map((year) => (
+                      <TouchableOpacity
+                        key={`to-${year}`}
+                        style={[
+                          styles.yearOption,
+                          customYearTo === year && styles.yearOptionSelected,
+                        ]}
+                        onPress={() => setCustomYearTo(year)}
+                      >
+                        <Text
+                          style={[
+                            styles.yearOptionText,
+                            customYearTo === year && styles.yearOptionTextSelected,
+                          ]}
+                        >
+                          {year}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              </View>
+            )}
           </ScrollView>
 
           {/* Fixed Start Button */}
@@ -294,7 +383,7 @@ export default function SoloModeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: '#0a0a0a',
   },
   flex: {
     flex: 1,
@@ -313,8 +402,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     color: '#fff',
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
+  },
+  headerSpacer: {
+    width: 24,
   },
   content: {
     flex: 1,
@@ -326,7 +418,7 @@ const styles = StyleSheet.create({
   menuCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -335,7 +427,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: 'rgba(229, 9, 20, 0.1)',
+    backgroundColor: 'rgba(0, 184, 148, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -364,7 +456,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -372,7 +464,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   goButton: {
-    backgroundColor: '#e50914',
+    backgroundColor: '#00b894',
     borderRadius: 12,
     paddingHorizontal: 24,
     justifyContent: 'center',
@@ -401,13 +493,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#222',
   },
   genreChipSelected: {
-    backgroundColor: '#e50914',
-    borderColor: '#e50914',
+    backgroundColor: '#00b894',
+    borderColor: '#00b894',
   },
   genreChipText: {
     color: '#888',
@@ -419,7 +511,7 @@ const styles = StyleSheet.create({
   },
   toggleContainer: {
     flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderRadius: 8,
     padding: 4,
     marginBottom: 16,
@@ -431,7 +523,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   toggleButtonActive: {
-    backgroundColor: '#0f0f0f',
+    backgroundColor: '#0a0a0a',
   },
   toggleButtonText: {
     color: '#666',
@@ -452,11 +544,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#222',
   },
   yearChipSelected: {
-    backgroundColor: '#e50914',
-    borderColor: '#e50914',
+    backgroundColor: '#00b894',
+    borderColor: '#00b894',
   },
   yearChipText: {
     color: '#888',
@@ -472,12 +564,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 16,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: '#0a0a0a',
     borderTopWidth: 1,
     borderTopColor: '#222',
   },
   startButton: {
-    backgroundColor: '#e50914',
+    backgroundColor: '#00b894',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -489,5 +581,41 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  customYearContainer: {
+    marginBottom: 16,
+  },
+  customYearPicker: {
+    marginBottom: 12,
+  },
+  customYearLabel: {
+    color: '#888',
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  yearOptionsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 16,
+  },
+  yearOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#141414',
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  yearOptionSelected: {
+    backgroundColor: '#00b894',
+    borderColor: '#00b894',
+  },
+  yearOptionText: {
+    color: '#888',
+    fontSize: 14,
+  },
+  yearOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '500',
   },
 });

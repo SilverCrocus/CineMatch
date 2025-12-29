@@ -12,7 +12,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Clipboard from 'expo-clipboard';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { api, Session } from '../../lib/api';
 import { Movie } from '../../types';
@@ -65,9 +64,10 @@ export default function SessionScreen() {
     return () => clearInterval(interval);
   }, [fetchSession]);
 
-  const copyCode = async () => {
+  const copyCode = () => {
     if (session?.code) {
-      await Clipboard.setStringAsync(session.code);
+      // Show the code in an alert for easy copying
+      Alert.alert('Session Code', session.code, [{ text: 'OK' }]);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -130,7 +130,7 @@ export default function SessionScreen() {
   if (loading) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#e50914" />
+        <ActivityIndicator size="large" color="#00b894" />
         <Text style={styles.loadingText}>Loading session...</Text>
       </View>
     );
@@ -441,11 +441,11 @@ export default function SessionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: '#0a0a0a',
   },
   centered: {
     flex: 1,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: '#0a0a0a',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   codeCard: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderRadius: 20,
     padding: 32,
     alignItems: 'center',
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
   participantChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderRadius: 24,
     paddingLeft: 4,
     paddingRight: 12,
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#333',
+    backgroundColor: '#00b894',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
   startButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e50914',
+    backgroundColor: '#00b894',
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderRadius: 12,
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
   continueButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e50914',
+    backgroundColor: '#00b894',
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 12,
@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
@@ -730,14 +730,14 @@ const styles = StyleSheet.create({
   },
   matchCard: {
     flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#141414',
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 12,
   },
   matchCardSelected: {
     borderWidth: 2,
-    borderColor: '#e50914',
+    borderColor: '#00b894',
   },
   matchPoster: {
     width: 70,
@@ -767,7 +767,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#e50914',
+    backgroundColor: '#00b894',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,

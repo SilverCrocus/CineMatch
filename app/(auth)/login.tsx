@@ -7,6 +7,12 @@ import { API_BASE_URL } from '../../lib/constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
+const TEST_USERS = [
+  { email: 'test-host@cinematch.test', name: 'Test Host', color: '#00b894' },
+  { email: 'test-guest1@cinematch.test', name: 'Test Guest 1', color: '#00cec9' },
+  { email: 'test-guest2@cinematch.test', name: 'Test Guest 2', color: '#0984e3' },
+];
+
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn, isAuthenticated } = useAuthContext();
@@ -18,39 +24,27 @@ export default function LoginScreen() {
     }
   }, [isAuthenticated]);
 
-  // For now, use a simple dev login flow
-  // TODO: Replace with proper Google OAuth configuration
-  async function handleSignIn() {
-    Alert.alert('Debug', 'Button pressed! Attempting login...');
-    console.log('[LOGIN] Button pressed, starting sign in...');
-    console.log('[LOGIN] API_BASE_URL:', API_BASE_URL);
+  async function handleSignIn(email: string) {
+    console.log('[LOGIN] Signing in as:', email);
 
     try {
       const url = `${API_BASE_URL}/api/auth/test-login`;
-      console.log('[LOGIN] Fetching:', url);
-
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'test-host@cinematch.test' }),
+        body: JSON.stringify({ email }),
       });
 
-      console.log('[LOGIN] Response status:', response.status);
       const data = await response.json();
-      console.log('[LOGIN] Response data:', JSON.stringify(data, null, 2));
 
       if (response.ok && data.token) {
-        console.log('[LOGIN] Token received, calling signIn...');
         await signIn(data.token, data.user);
-        console.log('[LOGIN] signIn complete, navigating to tabs...');
         router.replace('/(tabs)');
       } else {
         Alert.alert('Login Failed', data.error || 'Unknown error');
-        console.error('[LOGIN] Login failed:', data.error || 'Unknown error');
       }
     } catch (error: any) {
       Alert.alert('Error', `Sign in error: ${error.message || error}`);
-      console.error('[LOGIN] Sign in error:', error);
     }
   }
 
@@ -62,9 +56,16 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.googleButton} onPress={handleSignIn}>
-          <Text style={styles.googleButtonText}>Sign in with Google</Text>
-        </TouchableOpacity>
+        <Text style={styles.devLabel}>DEV: Select test account</Text>
+        {TEST_USERS.map((user) => (
+          <TouchableOpacity
+            key={user.email}
+            style={[styles.userButton, { backgroundColor: user.color }]}
+            onPress={() => handleSignIn(user.email)}
+          >
+            <Text style={styles.userButtonText}>{user.name}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
@@ -73,7 +74,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: '#0a0a0a',
     justifyContent: 'center',
     padding: 24,
   },
@@ -92,18 +93,25 @@ const styles = StyleSheet.create({
     color: '#888',
   },
   buttonContainer: {
-    gap: 16,
+    gap: 12,
   },
-  googleButton: {
-    backgroundColor: '#fff',
+  devLabel: {
+    color: '#666',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  userButton: {
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
     alignItems: 'center',
   },
-  googleButtonText: {
+  userButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: '#fff',
   },
 });
