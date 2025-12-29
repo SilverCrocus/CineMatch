@@ -15,11 +15,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cinematch.app",
+      "bundleIdentifier": "com.hivindiyagama.cinematch",
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Cinematch needs camera access to scan QR codes for joining sessions.",
-        "NSPhotoLibraryUsageDescription": "Cinematch needs photo library access to set your profile picture."
+        "NSPhotoLibraryUsageDescription": "Cinematch needs photo library access to set your profile picture.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
