@@ -101,8 +101,8 @@ export async function getRoomCode(page: Page): Promise<string> {
   // Wait for the lobby to fully load first
   await expect(page.locator("text=Session Lobby")).toBeVisible({ timeout: 30000 });
 
-  // The room code is displayed in a large font-mono element
-  const codeElement = page.locator(".font-mono.font-bold.tracking-widest").first();
+  // The room code is displayed in a large font-mono element (handles various tracking styles)
+  const codeElement = page.locator(".text-4xl.font-mono.font-bold").first();
   await expect(codeElement).toBeVisible({ timeout: 10000 });
   const code = await codeElement.textContent();
   if (!code) {

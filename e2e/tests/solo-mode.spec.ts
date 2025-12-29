@@ -93,12 +93,13 @@ test.describe("Solo Mode", () => {
       // Go to my list
       await page.goto("http://localhost:3000/solo/list");
 
-      // Should see at least 1 movie
-      await expect(page.locator("text=movies")).toBeVisible();
+      // Wait for list to load (Loading text disappears)
+      await page.waitForSelector("text=Loading...", { state: "hidden", timeout: 10000 });
 
-      // Hover over first movie and click remove
-      const firstMovie = page.locator(".group").first();
-      await firstMovie.hover();
+      // Should see the Saved tab with count (shows saved movies)
+      await expect(page.locator("text=Saved")).toBeVisible();
+
+      // Click remove on first movie (button is always visible now)
       await page.locator("text=Remove").first().click();
 
     } finally {
@@ -121,15 +122,17 @@ test.describe("Solo Mode", () => {
       // Click by genre
       await page.locator("text=By Genre").click();
 
-      // Should see genre badges
-      await expect(page.locator("text=Action")).toBeVisible();
-      await expect(page.locator("text=Comedy")).toBeVisible();
+      // Should see genre selection UI
+      await expect(page.locator("text=Select genres")).toBeVisible();
 
-      // Click action genre
+      // Click action genre badge to select it
       await page.locator("text=Action").click();
 
-      // Should navigate to swipe with genre param
-      await expect(page).toHaveURL(/\/solo\/swipe\?source=genre&genre=28/);
+      // Click "Start Swiping" button to navigate
+      await page.getByRole("button", { name: /Start Swiping/i }).click();
+
+      // Should navigate to swipe with browse source and genres param
+      await expect(page).toHaveURL(/\/solo\/swipe\?source=browse&genres=28/);
     } finally {
       await closeAllBrowsers(browsers);
     }
