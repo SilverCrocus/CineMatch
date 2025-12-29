@@ -19,13 +19,18 @@ interface SwipeDeckProps {
   movies: Movie[];
   onSwipeRight: (movie: Movie) => void;
   onSwipeLeft: (movie: Movie) => void;
+  initialIndex?: number;
+  onComplete?: () => void;
 }
 
 export default function SwipeDeck({
   movies,
   onSwipeRight,
   onSwipeLeft,
+  initialIndex = 0,
+  onComplete,
 }: SwipeDeckProps) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const translateX = useSharedValue(0);
   const isAnimating = useSharedValue(false);
   const [cardDimensions, setCardDimensions] = useState({ width: 0, height: 0 });
@@ -46,13 +51,21 @@ export default function SwipeDeck({
   };
 
   const handleSwipeComplete = (direction: 'left' | 'right') => {
-    const movie = movies[0];
+    const movie = movies[currentIndex];
     if (!movie) return;
 
     if (direction === 'right') {
       onSwipeRight(movie);
     } else {
       onSwipeLeft(movie);
+    }
+
+    const nextIndex = currentIndex + 1;
+    if (nextIndex >= movies.length) {
+      // All movies swiped
+      onComplete?.();
+    } else {
+      setCurrentIndex(nextIndex);
     }
   };
 
@@ -91,8 +104,8 @@ export default function SwipeDeck({
       }
     });
 
-  // Show top 3 cards
-  const visibleMovies = movies.slice(0, 3);
+  // Show top 3 cards starting from currentIndex
+  const visibleMovies = movies.slice(currentIndex, currentIndex + 3);
 
   // Animated style for the top card
   const topCardStyle = useAnimatedStyle(() => {
