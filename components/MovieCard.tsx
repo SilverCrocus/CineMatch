@@ -180,14 +180,14 @@ export default function MovieCard({
 
           {/* Score Badges */}
           <View style={styles.badges}>
-            {/* IMDB Badge */}
-            {movie.imdbId && (
+            {/* IMDB Badge - only show if we have both ID and rating */}
+            {movie.imdbId && movie.imdbRating && (
               <TouchableOpacity
                 style={[styles.badge, styles.imdbBadge]}
                 onPress={() => handleLinkPress(`https://www.imdb.com/title/${movie.imdbId}`)}
               >
                 <Text style={styles.imdbText}>
-                  IMDB {movie.imdbRating || ''}
+                  IMDB {movie.imdbRating}
                 </Text>
               </TouchableOpacity>
             )}
@@ -212,8 +212,8 @@ export default function MovieCard({
               </TouchableOpacity>
             )}
 
-            {/* Fallback: Show TMDB rating if no other scores */}
-            {!movie.imdbId && !movie.rtCriticScore && movie.vote_average !== undefined && (
+            {/* Fallback: Show TMDB rating if no IMDB/RT scores available */}
+            {!movie.imdbRating && !movie.rtCriticScore && movie.vote_average !== undefined && (
               <View style={[styles.badge, styles.tmdbBadge]}>
                 <Text style={styles.tmdbText}>⭐ {movie.vote_average.toFixed(1)}</Text>
               </View>
