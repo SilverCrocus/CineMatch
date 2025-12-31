@@ -131,14 +131,23 @@ export default function SwipeScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['myList'] });
     },
+    onError: (error) => {
+      console.error('[Swipe] Failed to like movie:', error);
+    },
   });
 
   const dismissMutation = useMutation({
     mutationFn: (movieId: number) => api.dismissMovie(movieId),
+    onError: (error) => {
+      console.error('[Swipe] Failed to dismiss movie:', error);
+    },
   });
 
   const undoDismissMutation = useMutation({
     mutationFn: (movieId: number) => api.undoDismiss(movieId),
+    onError: (error) => {
+      console.error('[Swipe] Failed to undo dismiss:', error);
+    },
   });
 
   const currentMovies = allMovies.slice(currentIndex);
@@ -180,7 +189,7 @@ export default function SwipeScreen() {
     }
 
     try {
-      await undoDismissMutation.mutateAsync(lastDismissed.tmdbId || lastDismissed.id);
+      await undoDismissMutation.mutateAsync(lastDismissed.tmdbId);
     } catch (e) {
       // Ignore error, still restore locally
     }
@@ -197,7 +206,7 @@ export default function SwipeScreen() {
     setShowUndoToast(false);
     setLastDismissed(null);
 
-    likeMutation.mutate(movie.tmdbId || movie.id);
+    likeMutation.mutate(movie.tmdbId);
     setSavedCount((prev) => prev + 1);
     setCurrentIndex((prev) => prev + 1);
 
@@ -211,7 +220,7 @@ export default function SwipeScreen() {
       clearTimeout(undoTimeoutRef.current);
     }
 
-    dismissMutation.mutate(movie.tmdbId || movie.id);
+    dismissMutation.mutate(movie.tmdbId);
     setLastDismissed(movie);
     setCurrentIndex((prev) => prev + 1);
     showToast();
