@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import EventSource from 'react-native-sse';
 import { API_BASE_URL, SECURE_STORE_KEYS } from './constants';
 import { Movie, Friend, User } from '../types';
 
@@ -105,7 +106,7 @@ export interface RTScoreUpdate {
 }
 
 // Streaming movies API - returns movies progressively with RT scores streamed separately
-// Falls back to regular API on React Native where streaming isn't supported
+// Uses react-native-sse EventSource for proper SSE support on React Native
 export async function streamMovies(
   params: MovieFilterParams | undefined,
   onMovie: (movie: Movie) => void,
@@ -124,128 +125,89 @@ export async function streamMovies(
   if (params?.movie) searchParams.set('movie', params.movie);
   const query = searchParams.toString();
 
-  let aborted = false;
+  const streamUrl = `${API_BASE_URL}/api/solo/movies/stream${query ? `?${query}` : ''}`;
+  console.log('[API Stream] Connecting to:', streamUrl);
 
-  // Try streaming first, fall back to regular API if streaming isn't supported
-  const fetchMovies = async () => {
+  // Create EventSource with auth header
+  const es = new EventSource(streamUrl, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  // Handle movie events
+  es.addEventListener('movie', (event) => {
     try {
-      // First, try the streaming endpoint
-      const streamUrl = `${API_BASE_URL}/api/solo/movies/stream${query ? `?${query}` : ''}`;
-      console.log('[API Stream] Connecting to:', streamUrl);
-
-      const response = await fetch(streamUrl, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          Accept: 'text/event-stream',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Stream error: ${response.status}`);
+      const data = event.data;
+      if (data) {
+        const parsed = JSON.parse(data);
+        console.log('[API Stream] Movie received:', parsed.title);
+        onMovie(parsed as Movie);
       }
-
-      // Check if streaming is supported (React Native doesn't support ReadableStream)
-      const reader = response.body?.getReader();
-      if (!reader) {
-        console.log('[API] Streaming not supported, falling back to regular API');
-        throw new Error('Streaming not supported');
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (!aborted) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        let currentEvent = '';
-        for (const line of lines) {
-          if (line.startsWith('event:')) {
-            currentEvent = line.slice(6).trim();
-          } else if (line.startsWith('data:')) {
-            const data = line.slice(5).trim();
-            if (!data) continue;
-
-            try {
-              const parsed = JSON.parse(data);
-
-              if (currentEvent === 'movie') {
-                console.log('[API Stream] Movie received:', parsed.title);
-                onMovie(parsed as Movie);
-              } else if (currentEvent === 'rt:update') {
-                console.log('[API Stream] RT update:', parsed.imdbId, parsed.rtCriticScore, parsed.rtAudienceScore);
-                onRTUpdate(parsed as RTScoreUpdate);
-              } else if (currentEvent === 'done') {
-                console.log('[API Stream] Done:', parsed);
-                onDone();
-              } else if (currentEvent === 'error') {
-                console.error('[API Stream] Error event:', parsed);
-                onError(new Error(parsed.message || 'Stream error'));
-              }
-            } catch {
-              // Skip malformed JSON
-            }
-          }
-        }
-      }
-
-      reader.releaseLock();
-    } catch (error) {
-      // If streaming failed (not supported or error), fall back to regular API
-      if (aborted) return;
-
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      if (errorMessage === 'Streaming not supported' || errorMessage.includes('No reader')) {
-        console.log('[API] Using fallback non-streaming API');
-        try {
-          const fallbackUrl = `${API_BASE_URL}/api/solo/movies${query ? `?${query}` : ''}`;
-          const fallbackResponse = await fetch(fallbackUrl, {
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-          });
-
-          if (!fallbackResponse.ok) {
-            throw new Error(`API error: ${fallbackResponse.status}`);
-          }
-
-          const data = await fallbackResponse.json();
-          const movies = data.movies || [];
-
-          console.log(`[API Fallback] Received ${movies.length} movies`);
-
-          // Emit each movie
-          for (const movie of movies) {
-            if (aborted) break;
-            onMovie(movie);
-          }
-
-          if (!aborted) {
-            onDone();
-          }
-        } catch (fallbackError) {
-          if (!aborted) {
-            console.error('[API Fallback] Error:', fallbackError);
-            onError(fallbackError instanceof Error ? fallbackError : new Error('Failed to load movies'));
-          }
-        }
-      } else {
-        console.error('[API Stream] Error:', error);
-        onError(error instanceof Error ? error : new Error('Stream failed'));
-      }
+    } catch (e) {
+      console.error('[API Stream] Failed to parse movie:', e);
     }
-  };
+  });
 
-  fetchMovies();
+  // Handle RT score updates
+  es.addEventListener('rt:update', (event) => {
+    try {
+      const data = event.data;
+      if (data) {
+        const parsed = JSON.parse(data);
+        console.log('[API Stream] RT update:', parsed.imdbId, parsed.rtCriticScore, parsed.rtAudienceScore);
+        onRTUpdate(parsed as RTScoreUpdate);
+      }
+    } catch (e) {
+      console.error('[API Stream] Failed to parse RT update:', e);
+    }
+  });
+
+  // Handle done event
+  es.addEventListener('done', (event) => {
+    try {
+      const data = event.data;
+      console.log('[API Stream] Done:', data);
+      es.close();
+      onDone();
+    } catch (e) {
+      console.error('[API Stream] Failed to parse done:', e);
+      es.close();
+      onDone();
+    }
+  });
+
+  // Handle server errors
+  es.addEventListener('error', (event) => {
+    const errorData = event.data;
+    console.error('[API Stream] Server error:', errorData);
+    es.close();
+    try {
+      const parsed = JSON.parse(errorData || '{}');
+      onError(new Error(parsed.message || 'Stream error'));
+    } catch {
+      onError(new Error('Stream error'));
+    }
+  });
+
+  // Handle connection errors
+  es.addEventListener('open', () => {
+    console.log('[API Stream] Connection opened');
+  });
+
+  // Handle EventSource errors (connection issues)
+  const originalOnError = es.onerror;
+  es.onerror = (error) => {
+    console.error('[API Stream] Connection error:', error);
+    es.close();
+    onError(new Error('Failed to connect to stream'));
+    if (originalOnError) originalOnError(error);
+  };
 
   // Return abort function
   return () => {
-    aborted = true;
+    console.log('[API Stream] Aborting stream');
+    es.close();
   };
 }
 
