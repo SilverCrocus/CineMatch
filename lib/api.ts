@@ -105,6 +105,7 @@ export interface RTScoreUpdate {
 }
 
 // Streaming movies API - returns movies progressively with RT scores streamed separately
+// Falls back to regular API on React Native where streaming isn't supported
 export async function streamMovies(
   params: MovieFilterParams | undefined,
   onMovie: (movie: Movie) => void,
@@ -123,14 +124,16 @@ export async function streamMovies(
   if (params?.movie) searchParams.set('movie', params.movie);
   const query = searchParams.toString();
 
-  const url = `${API_BASE_URL}/api/solo/movies/stream${query ? `?${query}` : ''}`;
-  console.log('[API Stream] Connecting to:', url);
-
   let aborted = false;
 
-  const fetchStream = async () => {
+  // Try streaming first, fall back to regular API if streaming isn't supported
+  const fetchMovies = async () => {
     try {
-      const response = await fetch(url, {
+      // First, try the streaming endpoint
+      const streamUrl = `${API_BASE_URL}/api/solo/movies/stream${query ? `?${query}` : ''}`;
+      console.log('[API Stream] Connecting to:', streamUrl);
+
+      const response = await fetch(streamUrl, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           Accept: 'text/event-stream',
@@ -141,8 +144,12 @@ export async function streamMovies(
         throw new Error(`Stream error: ${response.status}`);
       }
 
+      // Check if streaming is supported (React Native doesn't support ReadableStream)
       const reader = response.body?.getReader();
-      if (!reader) throw new Error('No reader available');
+      if (!reader) {
+        console.log('[API] Streaming not supported, falling back to regular API');
+        throw new Error('Streaming not supported');
+      }
 
       const decoder = new TextDecoder();
       let buffer = '';
@@ -188,14 +195,53 @@ export async function streamMovies(
 
       reader.releaseLock();
     } catch (error) {
-      if (!aborted) {
+      // If streaming failed (not supported or error), fall back to regular API
+      if (aborted) return;
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage === 'Streaming not supported' || errorMessage.includes('No reader')) {
+        console.log('[API] Using fallback non-streaming API');
+        try {
+          const fallbackUrl = `${API_BASE_URL}/api/solo/movies${query ? `?${query}` : ''}`;
+          const fallbackResponse = await fetch(fallbackUrl, {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          });
+
+          if (!fallbackResponse.ok) {
+            throw new Error(`API error: ${fallbackResponse.status}`);
+          }
+
+          const data = await fallbackResponse.json();
+          const movies = data.movies || [];
+
+          console.log(`[API Fallback] Received ${movies.length} movies`);
+
+          // Emit each movie
+          for (const movie of movies) {
+            if (aborted) break;
+            onMovie(movie);
+          }
+
+          if (!aborted) {
+            onDone();
+          }
+        } catch (fallbackError) {
+          if (!aborted) {
+            console.error('[API Fallback] Error:', fallbackError);
+            onError(fallbackError instanceof Error ? fallbackError : new Error('Failed to load movies'));
+          }
+        }
+      } else {
         console.error('[API Stream] Error:', error);
         onError(error instanceof Error ? error : new Error('Stream failed'));
       }
     }
   };
 
-  fetchStream();
+  fetchMovies();
 
   // Return abort function
   return () => {
