@@ -95,6 +95,7 @@ async function tmdbToMovie(tmdbId: number): Promise<Movie | null> {
       genres: details.genres.map((g) => g.name),
       synopsis: details.overview,
       runtime: details.runtime,
+      tmdbRating: details.vote_average || null,
       imdbRating: ratings.imdbRating,
       rtCriticScore: ratings.rtCriticScore,
       rtAudienceScore: ratings.rtAudienceScore,
@@ -135,6 +136,7 @@ export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
         genres: cached.genres,
         synopsis: cached.synopsis,
         runtime: cached.runtime,
+        tmdbRating: null, // Not cached, will show on re-fetch
         imdbRating: cached.imdb_rating,
         rtCriticScore: cached.rt_critic_score,
         rtAudienceScore: cached.rt_audience_score,
@@ -270,6 +272,7 @@ export async function searchMoviesByTitle(searchQuery: string): Promise<Movie[]>
     genres: getGenreNames(m.genre_ids),
     synopsis: m.overview,
     runtime: null,
+    tmdbRating: m.vote_average || null,
     imdbRating: null,
     rtCriticScore: null,
     rtAudienceScore: null,
