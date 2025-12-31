@@ -76,6 +76,7 @@ async function fetchMovieFast(tmdbId: number): Promise<Movie | null> {
       genres: details.genres.map((g) => g.name),
       synopsis: details.overview,
       runtime: details.runtime,
+      tmdbRating: details.vote_average || null,
       imdbRating: omdbRatings.imdbRating,
       rtCriticScore: omdbRatings.rtCriticScore,
       rtAudienceScore: null, // Will be filled by RT batch
