@@ -213,9 +213,9 @@ export default function MovieCard({
             )}
 
             {/* Fallback: Show TMDB rating if no IMDB/RT scores available */}
-            {!movie.imdbRating && !movie.rtCriticScore && movie.vote_average !== undefined && (
+            {!movie.imdbRating && !movie.rtCriticScore && (movie.tmdbRating || movie.vote_average) && (
               <View style={[styles.badge, styles.tmdbBadge]}>
-                <Text style={styles.tmdbText}>⭐ {movie.vote_average.toFixed(1)}</Text>
+                <Text style={styles.tmdbText}>⭐ {(movie.tmdbRating || movie.vote_average)?.toFixed(1)}</Text>
               </View>
             )}
           </View>
