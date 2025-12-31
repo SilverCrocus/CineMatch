@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { query, queryOne } from "@/lib/db";
+import { getAuthUser } from "@/lib/mobile-auth";
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -37,7 +36,7 @@ export async function POST(request: NextRequest) {
     // Check if already participant
     const existing = await queryOne<{ id: string }>(
       "SELECT id FROM session_participants WHERE session_id = $1 AND user_id = $2",
-      [sessionData.id, session.user.id]
+      [sessionData.id, user.id]
     );
 
     if (existing) {
@@ -48,7 +47,7 @@ export async function POST(request: NextRequest) {
     await query(
       `INSERT INTO session_participants (session_id, user_id, nickname)
        VALUES ($1, $2, $3)`,
-      [sessionData.id, session.user.id, session.user.name || "Guest"]
+      [sessionData.id, user.id, user.name || "Guest"]
     );
 
     return NextResponse.json({ sessionId: sessionData.id });

@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { queryMany } from "@/lib/db";
+import { getAuthUser } from "@/lib/mobile-auth";
 import {
   buildDeckFromFilters,
   searchMoviesByTitle,
 } from "@/lib/services/movies";
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  console.log("[API movies] User:", user?.id || "no user");
+
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -19,13 +20,25 @@ export async function GET(request: NextRequest) {
   const genre = searchParams.get("genre");
   const movie = searchParams.get("movie");
 
+  console.log("[API movies] Params:", { source, genre, movie });
+
   try {
-    // Get user's existing watchlist to exclude
-    const existing = await queryMany<{ movie_id: number }>(
-      "SELECT movie_id FROM solo_watchlist WHERE user_id = $1",
-      [session.user.id]
-    );
-    const existingIds = new Set(existing.map((e) => e.movie_id));
+    // Get user's existing watchlist AND dismissed to exclude
+    const [watchlist, dismissed] = await Promise.all([
+      queryMany<{ movie_id: number }>(
+        "SELECT movie_id FROM solo_watchlist WHERE user_id = $1",
+        [user.id]
+      ),
+      queryMany<{ movie_id: number }>(
+        "SELECT movie_id FROM solo_dismissed WHERE user_id = $1",
+        [user.id]
+      ),
+    ]);
+    const existingIds = new Set([
+      ...watchlist.map((e) => e.movie_id),
+      ...dismissed.map((e) => e.movie_id),
+    ]);
+    console.log("[API movies] Excluding", existingIds.size, "watched/dismissed movies");
 
     let movies;
 
@@ -37,6 +50,7 @@ export async function GET(request: NextRequest) {
         movies = await buildDeckFromFilters({
           genres: [parseInt(genre)],
           limit: 30,
+          excludeIds: existingIds,
         });
         break;
 
@@ -79,17 +93,22 @@ export async function GET(request: NextRequest) {
         movies = await buildDeckFromFilters({
           genres: genreIds.length > 0 ? genreIds.slice(0, 2) : undefined,
           limit: 30,
+          excludeIds: existingIds,
         });
         break;
 
       case "random":
       default:
-        movies = await buildDeckFromFilters({ limit: 30 });
+        movies = await buildDeckFromFilters({ limit: 30, excludeIds: existingIds });
         break;
     }
 
-    // Filter out movies already in watchlist
+    console.log("[API movies] Got", movies.length, "movies from buildDeckFromFilters");
+
+    // Double-check filter (should already be excluded, but just in case)
     const filtered = movies.filter((m) => !existingIds.has(m.tmdbId));
+
+    console.log("[API movies] Returning", filtered.length, "movies");
 
     return NextResponse.json({ movies: filtered });
   } catch (error) {

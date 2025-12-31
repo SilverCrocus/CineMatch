@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { query, queryMany } from "@/lib/db";
+import { getAuthUser } from "@/lib/mobile-auth";
 import { getMoviesByIds } from "@/lib/services/movies";
 
 interface DismissedRow {
@@ -10,10 +9,10 @@ interface DismissedRow {
   dismissed_at: string;
 }
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
+export async function GET(request: NextRequest) {
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -23,7 +22,7 @@ export async function GET() {
        FROM solo_dismissed
        WHERE user_id = $1
        ORDER BY dismissed_at DESC`,
-      [session.user.id]
+      [user.id]
     );
 
     if (items.length === 0) {
@@ -49,9 +48,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -66,7 +65,7 @@ export async function POST(request: NextRequest) {
       `INSERT INTO solo_dismissed (user_id, movie_id)
        VALUES ($1, $2)
        ON CONFLICT (user_id, movie_id) DO NOTHING`,
-      [session.user.id, movieId]
+      [user.id, movieId]
     );
 
     return NextResponse.json({ success: true });
@@ -77,9 +76,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -93,7 +92,7 @@ export async function DELETE(request: NextRequest) {
     await query(
       `DELETE FROM solo_dismissed
        WHERE user_id = $1 AND movie_id = $2`,
-      [session.user.id, movieId]
+      [user.id, movieId]
     );
 
     return NextResponse.json({ success: true });

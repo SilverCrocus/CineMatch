@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { queryMany } from "@/lib/db";
+import { getAuthUser } from "@/lib/mobile-auth";
 
 interface UserRow {
   id: string;
@@ -11,9 +10,9 @@ interface UserRow {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -30,7 +29,7 @@ export async function GET(request: NextRequest) {
       `SELECT id, name, email, image FROM users
        WHERE (email ILIKE $1 OR name ILIKE $1) AND id != $2
        LIMIT 10`,
-      [`%${searchQuery}%`, session.user.id]
+      [`%${searchQuery}%`, user.id]
     );
 
     return NextResponse.json({ users });

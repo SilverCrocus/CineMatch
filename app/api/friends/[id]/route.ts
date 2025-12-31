@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { query, queryOne } from "@/lib/db";
+import { getAuthUser } from "@/lib/mobile-auth";
 
 // PATCH - Accept friend request
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -21,7 +20,7 @@ export async function PATCH(
     const friendship = await queryOne<{ id: string }>(
       `SELECT id FROM friendships
        WHERE id = $1 AND friend_id = $2 AND status = 'pending'`,
-      [id, session.user.id]
+      [id, user.id]
     );
 
     if (!friendship) {
@@ -46,9 +45,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -59,7 +58,7 @@ export async function DELETE(
     await query(
       `DELETE FROM friendships
        WHERE id = $1 AND (user_id = $2 OR friend_id = $2)`,
-      [id, session.user.id]
+      [id, user.id]
     );
 
     return NextResponse.json({ success: true });

@@ -18,6 +18,7 @@ interface MovieFilters {
   yearFrom?: number;
   yearTo?: number;
   limit?: number;
+  excludeIds?: Set<number>; // TMDB IDs to skip
 }
 
 interface CachedMovieRow {
@@ -175,10 +176,12 @@ export async function buildDeckFromFilters(
   filters: MovieFilters
 ): Promise<Movie[]> {
   const limit = filters.limit || 20;
+  const excludeIds = filters.excludeIds || new Set<number>();
   const movies: Movie[] = [];
   let page = 1;
+  const maxPages = 10; // Search more pages to find enough non-excluded movies
 
-  while (movies.length < limit && page <= 5) {
+  while (movies.length < limit && page <= maxPages) {
     const { movies: tmdbMovies, totalPages } = await discoverMovies({
       genres: filters.genres,
       yearFrom: filters.yearFrom,
@@ -186,9 +189,12 @@ export async function buildDeckFromFilters(
       page,
     });
 
+    // Filter out excluded movies before fetching details
+    const candidateMovies = tmdbMovies.filter((m) => !excludeIds.has(m.id));
+
     // Fetch full details for each movie in parallel (batch of 5)
-    for (let i = 0; i < tmdbMovies.length && movies.length < limit; i += 5) {
-      const batch = tmdbMovies.slice(i, i + 5);
+    for (let i = 0; i < candidateMovies.length && movies.length < limit; i += 5) {
+      const batch = candidateMovies.slice(i, i + 5);
       const results = await Promise.all(
         batch.map((m) => getOrFetchMovie(m.id))
       );

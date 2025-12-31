@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { query, queryOne, queryMany } from "@/lib/db";
+import { getAuthUser } from "@/lib/mobile-auth";
 
 interface FriendshipRow {
   id: string;
@@ -19,10 +18,10 @@ interface UserRow {
 }
 
 // GET - List friends and pending requests
-export async function GET() {
-  const session = await getServerSession(authOptions);
+export async function GET(request: NextRequest) {
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -32,13 +31,13 @@ export async function GET() {
       `SELECT id, status, user_id, friend_id, created_at
        FROM friendships
        WHERE (user_id = $1 OR friend_id = $1) AND status = 'accepted'`,
-      [session.user.id]
+      [user.id]
     );
 
     // Get friend user details
     const friendIds = new Set<string>();
     friendships.forEach((f) => {
-      if (f.user_id === session.user.id) {
+      if (f.user_id === user.id) {
         friendIds.add(f.friend_id);
       } else {
         friendIds.add(f.user_id);
@@ -58,7 +57,7 @@ export async function GET() {
       `SELECT id, user_id, created_at
        FROM friendships
        WHERE friend_id = $1 AND status = 'pending'`,
-      [session.user.id]
+      [user.id]
     );
 
     // Get requester details
@@ -89,15 +88,15 @@ export async function GET() {
 
 // POST - Send friend request
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { friendId } = await request.json();
 
-  if (!friendId || friendId === session.user.id) {
+  if (!friendId || friendId === user.id) {
     return NextResponse.json({ error: "Invalid friend ID" }, { status: 400 });
   }
 
@@ -106,7 +105,7 @@ export async function POST(request: NextRequest) {
     const existing = await queryOne<{ id: string }>(
       `SELECT id FROM friendships
        WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)`,
-      [session.user.id, friendId]
+      [user.id, friendId]
     );
 
     if (existing) {
@@ -120,7 +119,7 @@ export async function POST(request: NextRequest) {
     await query(
       `INSERT INTO friendships (user_id, friend_id, status)
        VALUES ($1, $2, 'pending')`,
-      [session.user.id, friendId]
+      [user.id, friendId]
     );
 
     return NextResponse.json({ success: true });

@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { query, queryOne } from "@/lib/db";
+import { getAuthUser } from "@/lib/mobile-auth";
 import { generateRoomCode } from "@/lib/utils";
 import { buildDeckFromFilters, buildDeckFromTitles } from "@/lib/services/movies";
 import { parseMovieListUrl, parseTextList } from "@/lib/parsers";
 import type { DeckSource } from "@/types";
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -87,7 +86,7 @@ export async function POST(request: NextRequest) {
       `INSERT INTO sessions (code, host_id, deck, status)
        VALUES ($1, $2, $3, 'lobby')
        RETURNING id, code`,
-      [code, session.user.id, deck]
+      [code, user.id, deck]
     );
 
     if (!newSession) {
@@ -98,7 +97,7 @@ export async function POST(request: NextRequest) {
     await query(
       `INSERT INTO session_participants (session_id, user_id, nickname)
        VALUES ($1, $2, $3)`,
-      [newSession.id, session.user.id, session.user.name || "Host"]
+      [newSession.id, user.id, user.name || "Host"]
     );
 
     return NextResponse.json({

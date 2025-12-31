@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { query, queryOne } from "@/lib/db";
+import { getAuthUser } from "@/lib/mobile-auth";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -37,13 +36,13 @@ export async function POST(
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (session_id, user_id, movie_id)
        DO UPDATE SET liked = $4`,
-      [id, session.user.id, movieId, liked]
+      [id, user.id, movieId, liked]
     );
 
     // Check if user completed all swipes
     const swipeCountResult = await queryOne<{ count: string }>(
       "SELECT COUNT(*) as count FROM swipes WHERE session_id = $1 AND user_id = $2",
-      [id, session.user.id]
+      [id, user.id]
     );
 
     const swipeCount = parseInt(swipeCountResult?.count || "0", 10);
@@ -52,7 +51,7 @@ export async function POST(
       // Mark participant as completed
       await query(
         "UPDATE session_participants SET completed = true WHERE session_id = $1 AND user_id = $2",
-        [id, session.user.id]
+        [id, user.id]
       );
     }
 

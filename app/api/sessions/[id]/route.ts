@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { queryOne, queryMany } from "@/lib/db";
+import { getAuthUser } from "@/lib/mobile-auth";
 import { getMoviesByIds } from "@/lib/services/movies";
 
 interface SessionRow {
@@ -30,9 +29,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -61,7 +60,7 @@ export async function GET(
 
     // Check if user is participant
     const isParticipant = participants.some(
-      (p) => p.user_id === session.user.id
+      (p) => p.user_id === user.id
     );
 
     if (!isParticipant) {
@@ -76,7 +75,7 @@ export async function GET(
     if (sessionData.status !== "lobby") {
       const swipes = await queryMany<SwipeRow>(
         "SELECT movie_id, liked FROM swipes WHERE session_id = $1 AND user_id = $2",
-        [id, session.user.id]
+        [id, user.id]
       );
 
       userSwipes = Object.fromEntries(
@@ -102,7 +101,7 @@ export async function GET(
       })),
       movies,
       userSwipes,
-      isHost: sessionData.host_id === session.user.id,
+      isHost: sessionData.host_id === user.id,
     });
   } catch (error) {
     console.error("Error fetching session:", error);

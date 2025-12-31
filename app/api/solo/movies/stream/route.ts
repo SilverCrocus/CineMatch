@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { query, queryMany } from "@/lib/db";
+import { getAuthUser } from "@/lib/mobile-auth";
 import {
   discoverMovies,
   getMovieDetails,
@@ -90,9 +89,9 @@ async function fetchMovieFast(tmdbId: number): Promise<Movie | null> {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -125,11 +124,11 @@ export async function GET(request: NextRequest) {
         const [watchlist, dismissed] = await Promise.all([
           queryMany<{ movie_id: number }>(
             "SELECT movie_id FROM solo_watchlist WHERE user_id = $1",
-            [session.user.id]
+            [user.id]
           ),
           queryMany<{ movie_id: number }>(
             "SELECT movie_id FROM solo_dismissed WHERE user_id = $1",
-            [session.user.id]
+            [user.id]
           ),
         ]);
         const existingIds = new Set([

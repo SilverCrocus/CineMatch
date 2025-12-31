@@ -59,12 +59,15 @@ const GENRE_MAP: Record<number, string> = {
 
 async function tmdbFetch<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
-  url.searchParams.append("api_key", process.env.TMDB_API_KEY || "");
+  const apiKey = process.env.TMDB_API_KEY || "";
+  url.searchParams.append("api_key", apiKey);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       url.searchParams.append(key, value);
     });
   }
+
+  console.log(`[TMDB] Fetching: ${endpoint}, API key present: ${!!apiKey}, key length: ${apiKey.length}`);
 
   const response = await fetch(url.toString(), {
     headers: {
@@ -74,10 +77,14 @@ async function tmdbFetch<T>(endpoint: string, params?: Record<string, string>): 
   });
 
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[TMDB] Error ${response.status}: ${errorText}`);
     throw new Error(`TMDB API error: ${response.status}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  console.log(`[TMDB] Success: ${endpoint}, results: ${(data as { results?: unknown[] }).results?.length || 'N/A'}`);
+  return data;
 }
 
 export async function discoverMovies(filters: {

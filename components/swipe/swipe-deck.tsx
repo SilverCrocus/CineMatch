@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { SwipeCard } from "./swipe-card";
@@ -22,11 +22,17 @@ export function SwipeDeck({ movies, onSwipe, onComplete, initialSwipes = {} }: S
     return firstUnswiped === -1 ? movies.length : firstUnswiped;
   });
 
+  // Track swipe direction for exit animation
+  const swipeDirectionRef = useRef<"left" | "right" | null>(null);
+
   const handleSwipe = (liked: boolean) => {
     const movie = movies[currentIndex];
     if (movie) {
       onSwipe(movie.tmdbId, liked);
     }
+
+    // Set direction for exit animation
+    swipeDirectionRef.current = liked ? "right" : "left";
 
     const nextIndex = currentIndex + 1;
     setCurrentIndex(nextIndex);
@@ -37,7 +43,6 @@ export function SwipeDeck({ movies, onSwipe, onComplete, initialSwipes = {} }: S
   };
 
   const progress = Math.min(currentIndex, movies.length);
-  const remaining = movies.length - progress;
 
   if (currentIndex >= movies.length) {
     return (
@@ -50,29 +55,16 @@ export function SwipeDeck({ movies, onSwipe, onComplete, initialSwipes = {} }: S
 
   return (
     <div className="flex flex-col h-full">
-      {/* Progress */}
-      <div className="px-4 py-2">
-        <div className="flex justify-between text-sm text-muted-foreground mb-2">
-          <span>{progress} / {movies.length}</span>
-          <span>{remaining} left</span>
-        </div>
-        <div className="h-1 bg-secondary rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${(progress / movies.length) * 100}%` }}
-          />
-        </div>
-      </div>
-
       {/* Card Stack */}
       <div className="flex-1 relative mx-4 my-4">
-        <AnimatePresence>
+        <AnimatePresence mode="popLayout">
           {movies.slice(currentIndex, currentIndex + 2).reverse().map((movie, i) => (
             <SwipeCard
               key={movie.tmdbId}
               movie={movie}
               onSwipe={handleSwipe}
               isTop={i === (currentIndex + 1 < movies.length ? 1 : 0)}
+              exitDirection={swipeDirectionRef.current}
             />
           ))}
         </AnimatePresence>
@@ -96,6 +88,11 @@ export function SwipeDeck({ movies, onSwipe, onComplete, initialSwipes = {} }: S
         >
           <ThumbsUp className="h-8 w-8" />
         </Button>
+      </div>
+
+      {/* Progress */}
+      <div className="text-center text-sm text-muted-foreground pb-4">
+        {progress + 1} / {movies.length}
       </div>
     </div>
   );

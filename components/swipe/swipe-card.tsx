@@ -11,9 +11,10 @@ interface SwipeCardProps {
   movie: Movie;
   onSwipe: (liked: boolean) => void;
   isTop: boolean;
+  exitDirection?: "left" | "right" | null;
 }
 
-export function SwipeCard({ movie, onSwipe, isTop }: SwipeCardProps) {
+export function SwipeCard({ movie, onSwipe, isTop, exitDirection }: SwipeCardProps) {
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-12, 12]);
   const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
@@ -29,10 +30,22 @@ export function SwipeCard({ movie, onSwipe, isTop }: SwipeCardProps) {
     }
   }
 
+  // Calculate exit position based on swipe direction
+  const exitX = exitDirection === "right" ? 400 : exitDirection === "left" ? -400 : 0;
+
   return (
     <motion.div
       className="absolute w-full h-full cursor-grab active:cursor-grabbing"
       style={{ x, rotate, opacity }}
+      initial={{ scale: 0.95, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{
+        x: exitX,
+        opacity: 0,
+        rotate: exitDirection === "right" ? 20 : exitDirection === "left" ? -20 : 0,
+        transition: { duration: 0.3 }
+      }}
+      transition={{ duration: 0.2 }}
       drag={isTop ? "x" : false}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.7}

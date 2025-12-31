@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { queryMany } from "@/lib/db";
+import { getAuthUser } from "@/lib/mobile-auth";
 import { getMoviesByIds } from "@/lib/services/movies";
 
 interface Params {
@@ -9,10 +8,10 @@ interface Params {
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthUser(request);
   const { id: sessionId } = await params;
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
