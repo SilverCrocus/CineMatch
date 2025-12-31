@@ -115,9 +115,13 @@ export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
   );
 
   if (cached) {
-    // Check if cache is still valid (24 hours)
     const cacheAge = Date.now() - new Date(cached.cached_at).getTime();
-    const cacheValid = cacheAge < 24 * 60 * 60 * 1000;
+
+    // Use shorter TTL if ratings are missing (might be API failure)
+    // 1 hour for missing ratings, 24 hours for complete data
+    const hasRatings = cached.imdb_rating || cached.rt_critic_score;
+    const cacheTTL = hasRatings ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
+    const cacheValid = cacheAge < cacheTTL;
 
     if (cacheValid) {
       return {
