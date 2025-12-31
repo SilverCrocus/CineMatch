@@ -96,8 +96,115 @@ export interface MovieFilterParams {
   movie?: string; // for "similar to" search
 }
 
+// RT score update from streaming API
+export interface RTScoreUpdate {
+  imdbId: string;
+  rtCriticScore: string | null;
+  rtAudienceScore: string | null;
+  rtUrl: string | null;
+}
+
+// Streaming movies API - returns movies progressively with RT scores streamed separately
+export async function streamMovies(
+  params: MovieFilterParams | undefined,
+  onMovie: (movie: Movie) => void,
+  onRTUpdate: (update: RTScoreUpdate) => void,
+  onDone: () => void,
+  onError: (error: Error) => void
+): Promise<() => void> {
+  const token = await SecureStore.getItemAsync(SECURE_STORE_KEYS.SESSION_TOKEN);
+
+  const searchParams = new URLSearchParams();
+  if (params?.source) searchParams.set('source', params.source);
+  if (params?.genres) searchParams.set('genres', params.genres);
+  if (params?.match) searchParams.set('match', params.match);
+  if (params?.yearFrom) searchParams.set('yearFrom', String(params.yearFrom));
+  if (params?.yearTo) searchParams.set('yearTo', String(params.yearTo));
+  if (params?.movie) searchParams.set('movie', params.movie);
+  const query = searchParams.toString();
+
+  const url = `${API_BASE_URL}/api/solo/movies/stream${query ? `?${query}` : ''}`;
+  console.log('[API Stream] Connecting to:', url);
+
+  let aborted = false;
+
+  const fetchStream = async () => {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Accept: 'text/event-stream',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Stream error: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No reader available');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (!aborted) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        let currentEvent = '';
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            currentEvent = line.slice(6).trim();
+          } else if (line.startsWith('data:')) {
+            const data = line.slice(5).trim();
+            if (!data) continue;
+
+            try {
+              const parsed = JSON.parse(data);
+
+              if (currentEvent === 'movie') {
+                console.log('[API Stream] Movie received:', parsed.title);
+                onMovie(parsed as Movie);
+              } else if (currentEvent === 'rt:update') {
+                console.log('[API Stream] RT update:', parsed.imdbId, parsed.rtCriticScore, parsed.rtAudienceScore);
+                onRTUpdate(parsed as RTScoreUpdate);
+              } else if (currentEvent === 'done') {
+                console.log('[API Stream] Done:', parsed);
+                onDone();
+              } else if (currentEvent === 'error') {
+                console.error('[API Stream] Error event:', parsed);
+                onError(new Error(parsed.message || 'Stream error'));
+              }
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+
+      reader.releaseLock();
+    } catch (error) {
+      if (!aborted) {
+        console.error('[API Stream] Error:', error);
+        onError(error instanceof Error ? error : new Error('Stream failed'));
+      }
+    }
+  };
+
+  fetchStream();
+
+  // Return abort function
+  return () => {
+    aborted = true;
+  };
+}
+
 export const api = {
-  // Solo mode - movies
+  // Solo mode - movies (non-streaming fallback)
   getMovies: (params?: MovieFilterParams) => {
     const searchParams = new URLSearchParams();
     if (params?.source) searchParams.set('source', params.source);
@@ -148,13 +255,29 @@ export const api = {
   },
 
   // Friends
-  getFriends: () => fetchAPI<{ friends: Friend[] }>('/api/friends'),
+  getFriends: () =>
+    fetchAPI<{
+      friends: User[];
+      pendingRequests: Array<{
+        id: string;
+        createdAt: string;
+        user: User;
+      }>;
+    }>('/api/friends'),
   searchUsers: (query: string) =>
     fetchAPI<{ users: User[] }>(`/api/friends/search?q=${encodeURIComponent(query)}`),
-  addFriend: (userId: string) =>
-    fetchAPI('/api/friends', {
+  sendFriendRequest: (friendId: string) =>
+    fetchAPI<{ success: boolean }>('/api/friends', {
       method: 'POST',
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ friendId }),
+    }),
+  acceptFriendRequest: (requestId: string) =>
+    fetchAPI<{ success: boolean }>(`/api/friends/${requestId}`, {
+      method: 'PATCH',
+    }),
+  rejectFriendRequest: (requestId: string) =>
+    fetchAPI<{ success: boolean }>(`/api/friends/${requestId}`, {
+      method: 'DELETE',
     }),
 
   // Sessions
@@ -189,8 +312,12 @@ export const api = {
     return fetchAPI<{ matches: Movie[] }>(`/api/sessions/${sessionId}/reveal`);
   },
 
-  getPrematches: (sessionId: string) =>
-    fetchAPI<{ movies: Movie[] }>(`/api/sessions/${sessionId}/prematches`),
+  getPrematches: async (sessionId: string) => {
+    const response = await fetchAPI<{ prematches: Array<{ movie: Movie }> }>(
+      `/api/sessions/${sessionId}/prematches`
+    );
+    return { movies: response.prematches.map((p) => p.movie).filter(Boolean) };
+  },
 
   selectMovie: (sessionId: string, movieId: number) =>
     fetchAPI(`/api/sessions/${sessionId}/select`, {

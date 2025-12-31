@@ -10,13 +10,13 @@ import Animated, {
   withTiming,
   useSharedValue,
 } from 'react-native-reanimated';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import SwipeDeck from '../../components/SwipeDeck';
-import { api, MovieFilterParams } from '../../lib/api';
+import { api, MovieFilterParams, streamMovies, RTScoreUpdate } from '../../lib/api';
 import { Movie } from '../../types';
 
 export default function SwipeScreen() {
@@ -37,37 +37,94 @@ export default function SwipeScreen() {
   const [savedCount, setSavedCount] = useState(0);
   const [showUndoToast, setShowUndoToast] = useState(false);
   const [lastDismissed, setLastDismissed] = useState<Movie | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [streamComplete, setStreamComplete] = useState(false);
   const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortStreamRef = useRef<(() => void) | null>(null);
   const toastOpacity = useSharedValue(0);
 
-  // Build filter params from URL
-  const filterParams: MovieFilterParams = {
+  // Build filter params from URL (memoized to prevent unnecessary re-renders)
+  const filterParams: MovieFilterParams = useMemo(() => ({
     source: (params.source as MovieFilterParams['source']) || 'random',
     genres: params.genres,
     match: params.match as MovieFilterParams['match'],
     yearFrom: params.yearFrom ? parseInt(params.yearFrom) : undefined,
     yearTo: params.yearTo ? parseInt(params.yearTo) : undefined,
     movie: params.movie,
-  };
+  }), [params.source, params.genres, params.match, params.yearFrom, params.yearTo, params.movie]);
 
-  const { isLoading, error, refetch, data } = useQuery({
-    queryKey: ['movies', filterParams],
-    queryFn: () => api.getMovies(filterParams),
-    staleTime: 0,
-    refetchOnMount: 'always',
-  });
+  // Handle incoming movie from stream
+  const handleMovieReceived = useCallback((movie: Movie) => {
+    setAllMovies((prev) => {
+      // Don't add duplicates
+      if (prev.some((m) => m.id === movie.id)) return prev;
+      return [...prev, movie];
+    });
+    // Hide loading after first movie arrives
+    setIsLoading(false);
+  }, []);
 
-  // Update allMovies when data changes
+  // Handle RT score update from stream
+  const handleRTUpdate = useCallback((update: RTScoreUpdate) => {
+    setAllMovies((prev) =>
+      prev.map((movie) => {
+        if (movie.imdbId === update.imdbId) {
+          return {
+            ...movie,
+            rtCriticScore: update.rtCriticScore,
+            rtAudienceScore: update.rtAudienceScore,
+            rtUrl: update.rtUrl,
+          };
+        }
+        return movie;
+      })
+    );
+  }, []);
+
+  // Start streaming movies
+  const startStream = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    setStreamComplete(false);
+
+    const abort = await streamMovies(
+      filterParams,
+      handleMovieReceived,
+      handleRTUpdate,
+      () => {
+        console.log('[Swipe] Stream complete');
+        setStreamComplete(true);
+      },
+      (err) => {
+        console.error('[Swipe] Stream error:', err);
+        setError(err);
+        setIsLoading(false);
+      }
+    );
+
+    abortStreamRef.current = abort;
+  }, [filterParams, handleMovieReceived, handleRTUpdate]);
+
+  // Start stream on mount
   useEffect(() => {
-    if (data?.movies) {
-      setAllMovies((prev) => {
-        const existingIds = new Set(prev.map((m) => m.id));
-        const newMovies = data.movies.filter((m: Movie) => !existingIds.has(m.id));
-        if (newMovies.length === 0) return prev;
-        return [...prev, ...newMovies];
-      });
-    }
-  }, [data]);
+    startStream();
+
+    return () => {
+      // Cleanup: abort stream on unmount
+      if (abortStreamRef.current) {
+        abortStreamRef.current();
+      }
+    };
+  }, []); // Only run on mount
+
+  // Refetch function for when we need more movies
+  const refetch = useCallback(() => {
+    if (!streamComplete) return; // Don't refetch while streaming
+    setAllMovies([]);
+    setCurrentIndex(0);
+    startStream();
+  }, [streamComplete, startStream]);
 
   const likeMutation = useMutation({
     mutationFn: (movieId: number) => api.likeMovie(movieId),
@@ -185,7 +242,7 @@ export default function SwipeScreen() {
     }
   };
 
-  if ((isLoading || !data) && allMovies.length === 0) {
+  if (isLoading && allMovies.length === 0) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color="#00b894" />
