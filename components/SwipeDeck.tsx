@@ -19,7 +19,6 @@ interface SwipeDeckProps {
   movies: Movie[];
   onSwipeRight: (movie: Movie) => void;
   onSwipeLeft: (movie: Movie) => void;
-  initialIndex?: number;
   onComplete?: () => void;
 }
 
@@ -27,10 +26,10 @@ export default function SwipeDeck({
   movies,
   onSwipeRight,
   onSwipeLeft,
-  initialIndex = 0,
   onComplete,
 }: SwipeDeckProps) {
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  // No internal index - parent manages the index by slicing the movies array
+  // movies[0] is always the top card
   const translateX = useSharedValue(0);
   const isAnimating = useSharedValue(false);
   const [cardDimensions, setCardDimensions] = useState({ width: 0, height: 0 });
@@ -51,7 +50,8 @@ export default function SwipeDeck({
   };
 
   const handleSwipeComplete = (direction: 'left' | 'right') => {
-    const movie = movies[currentIndex];
+    // Top card is always movies[0] since parent slices the array
+    const movie = movies[0];
     if (!movie) return;
 
     if (direction === 'right') {
@@ -60,12 +60,10 @@ export default function SwipeDeck({
       onSwipeLeft(movie);
     }
 
-    const nextIndex = currentIndex + 1;
-    if (nextIndex >= movies.length) {
-      // All movies swiped
+    // Parent will update the movies array, which triggers re-render
+    // If no more movies, parent handles the completion state
+    if (movies.length <= 1) {
       onComplete?.();
-    } else {
-      setCurrentIndex(nextIndex);
     }
   };
 
@@ -104,8 +102,8 @@ export default function SwipeDeck({
       }
     });
 
-  // Show top 3 cards starting from currentIndex
-  const visibleMovies = movies.slice(currentIndex, currentIndex + 3);
+  // Show top 3 cards - movies[0] is always the top card (parent manages index)
+  const visibleMovies = movies.slice(0, 3);
 
   // Animated style for the top card
   const topCardStyle = useAnimatedStyle(() => {
