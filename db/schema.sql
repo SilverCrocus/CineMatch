@@ -35,6 +35,7 @@ CREATE TABLE cached_movies (
   genres TEXT[] DEFAULT '{}',
   synopsis TEXT,
   runtime INTEGER,
+  tmdb_rating NUMERIC(3,1),
   imdb_rating VARCHAR(10),
   rt_critic_score VARCHAR(10),
   rt_audience_score VARCHAR(10),

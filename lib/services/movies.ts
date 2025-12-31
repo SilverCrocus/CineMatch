@@ -10,7 +10,7 @@ import {
   searchMovies,
 } from "@/lib/api/tmdb";
 import { getOMDbRatings } from "@/lib/api/omdb";
-import { getRTRatings } from "@/lib/api/rottentomatoes";
+import { getRTRatings, streamRTBatch } from "@/lib/api/rottentomatoes";
 import type { Movie } from "@/types";
 
 interface MovieFilters {
@@ -32,6 +32,7 @@ interface CachedMovieRow {
   genres: string[];
   synopsis: string;
   runtime: number | null;
+  tmdb_rating: number | null;
   imdb_rating: string | null;
   rt_critic_score: string | null;
   rt_audience_score: string | null;
@@ -75,6 +76,44 @@ async function enrichMovieWithRatings(
   };
 }
 
+/**
+ * Fetch basic movie data from TMDB without ratings enrichment.
+ * Used for batch processing where ratings are fetched separately.
+ */
+async function tmdbToMovieBasic(tmdbId: number): Promise<Movie | null> {
+  try {
+    const [details, providers] = await Promise.all([
+      getMovieDetails(tmdbId),
+      getWatchProviders(tmdbId),
+    ]);
+
+    return {
+      id: `tmdb-${tmdbId}`,
+      tmdbId,
+      imdbId: details.imdb_id,
+      title: details.title,
+      year: getYear(details.release_date),
+      posterUrl: getPosterUrl(details.poster_path, "w500"),
+      backdropUrl: getBackdropUrl(details.backdrop_path, "w1280"),
+      genres: details.genres.map((g) => g.name),
+      synopsis: details.overview,
+      runtime: details.runtime,
+      tmdbRating: details.vote_average || null,
+      imdbRating: null,
+      rtCriticScore: null,
+      rtAudienceScore: null,
+      rtUrl: null,
+      streamingServices: providers,
+    };
+  } catch (error) {
+    console.error(`Failed to fetch movie details for TMDB ID ${tmdbId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Full tmdbToMovie with ratings - used for individual movie fetches (cache miss)
+ */
 async function tmdbToMovie(tmdbId: number): Promise<Movie | null> {
   try {
     const [details, providers] = await Promise.all([
@@ -108,8 +147,128 @@ async function tmdbToMovie(tmdbId: number): Promise<Movie | null> {
   }
 }
 
-export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
-  // Check cache first
+/**
+ * Batch enrich movies with ratings from OMDb and RT.
+ * Much faster than enriching one at a time.
+ */
+async function enrichMoviesWithRatingsBatch(movies: Movie[]): Promise<Movie[]> {
+  // Filter movies that have imdbIds for rating lookup
+  const moviesWithImdb = movies.filter((m) => m.imdbId);
+  const imdbIds = moviesWithImdb.map((m) => m.imdbId!);
+
+  if (imdbIds.length === 0) {
+    return movies;
+  }
+
+  // Create a map for quick lookup
+  const ratingsMap = new Map<string, EnrichedRatings>();
+
+  // Initialize with empty ratings
+  for (const imdbId of imdbIds) {
+    ratingsMap.set(imdbId, {
+      imdbRating: null,
+      rtCriticScore: null,
+      rtAudienceScore: null,
+      rtUrl: null,
+    });
+  }
+
+  // Fetch OMDb ratings in parallel batches of 5
+  const omdbBatchSize = 5;
+  const omdbPromises: Promise<void>[] = [];
+
+  for (let i = 0; i < imdbIds.length; i += omdbBatchSize) {
+    const batch = imdbIds.slice(i, i + omdbBatchSize);
+    const batchPromise = Promise.all(
+      batch.map(async (imdbId) => {
+        try {
+          const omdbRatings = await getOMDbRatings(imdbId);
+          const existing = ratingsMap.get(imdbId)!;
+          existing.imdbRating = omdbRatings.imdbRating;
+          // OMDb RT score is fallback only - don't overwrite if RT API already set it
+          if (!existing.rtCriticScore && omdbRatings.rtCriticScore) {
+            existing.rtCriticScore = omdbRatings.rtCriticScore;
+          }
+        } catch (error) {
+          console.error(`Failed to fetch OMDb ratings for ${imdbId}:`, error);
+        }
+      })
+    ).then(() => {});
+    omdbPromises.push(batchPromise);
+  }
+
+  // Fetch RT ratings using streaming batch endpoint (runs in parallel with OMDb)
+  const rtPromise = (async () => {
+    try {
+      for await (const result of streamRTBatch(imdbIds)) {
+        if (!result.error) {
+          const existing = ratingsMap.get(result.imdbId);
+          if (existing) {
+            // RT API scores take priority over OMDb
+            if (result.criticScore) existing.rtCriticScore = result.criticScore;
+            existing.rtAudienceScore = result.audienceScore;
+            existing.rtUrl = result.rtUrl;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch RT batch ratings:", error);
+    }
+  })();
+
+  // Wait for all rating fetches to complete
+  await Promise.all([...omdbPromises, rtPromise]);
+
+  // Apply ratings to movies
+  return movies.map((movie) => {
+    if (!movie.imdbId) return movie;
+
+    const ratings = ratingsMap.get(movie.imdbId);
+    if (!ratings) return movie;
+
+    return {
+      ...movie,
+      imdbRating: ratings.imdbRating,
+      rtCriticScore: ratings.rtCriticScore,
+      rtAudienceScore: ratings.rtAudienceScore,
+      rtUrl: ratings.rtUrl,
+    };
+  });
+}
+
+/**
+ * Cache a movie to the database
+ */
+async function cacheMovie(movie: Movie): Promise<void> {
+  await query(
+    `INSERT INTO cached_movies (tmdb_id, imdb_id, title, year, poster_url, backdrop_url, genres, synopsis, runtime, tmdb_rating, imdb_rating, rt_critic_score, rt_audience_score, rt_url, streaming_services, cached_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+     ON CONFLICT (tmdb_id)
+     DO UPDATE SET imdb_id = $2, title = $3, year = $4, poster_url = $5, backdrop_url = $6, genres = $7, synopsis = $8, runtime = $9, tmdb_rating = $10, imdb_rating = $11, rt_critic_score = $12, rt_audience_score = $13, rt_url = $14, streaming_services = $15, cached_at = NOW()`,
+    [
+      movie.tmdbId,
+      movie.imdbId,
+      movie.title,
+      movie.year,
+      movie.posterUrl,
+      movie.backdropUrl,
+      movie.genres,
+      movie.synopsis,
+      movie.runtime,
+      movie.tmdbRating,
+      movie.imdbRating,
+      movie.rtCriticScore,
+      movie.rtAudienceScore,
+      movie.rtUrl,
+      movie.streamingServices,
+    ]
+  );
+}
+
+/**
+ * Check cache for a movie. Returns the movie if found and valid, null otherwise.
+ */
+async function getMovieFromCache(tmdbId: number): Promise<Movie | null> {
   const cached = await queryOne<CachedMovieRow>(
     "SELECT * FROM cached_movies WHERE tmdb_id = $1",
     [tmdbId]
@@ -118,10 +277,10 @@ export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
   if (cached) {
     const cacheAge = Date.now() - new Date(cached.cached_at).getTime();
 
-    // Use shorter TTL if ratings are missing (might be API failure)
-    // 1 hour for missing ratings, 24 hours for complete data
-    const hasRatings = cached.imdb_rating || cached.rt_critic_score;
-    const cacheTTL = hasRatings ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
+    // Use shorter TTL if RT scores are missing (might be API failure)
+    // 24 hours for complete RT data, 2 minutes if RT missing (aggressive retry)
+    const hasRTScores = cached.rt_critic_score || cached.rt_audience_score;
+    const cacheTTL = hasRTScores ? 24 * 60 * 60 * 1000 : 2 * 60 * 1000;
     const cacheValid = cacheAge < cacheTTL;
 
     if (cacheValid) {
@@ -136,7 +295,7 @@ export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
         genres: cached.genres,
         synopsis: cached.synopsis,
         runtime: cached.runtime,
-        tmdbRating: null, // Not cached, will show on re-fetch
+        tmdbRating: cached.tmdb_rating,
         imdbRating: cached.imdb_rating,
         rtCriticScore: cached.rt_critic_score,
         rtAudienceScore: cached.rt_audience_score,
@@ -146,34 +305,21 @@ export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
     }
   }
 
-  // Fetch fresh data
+  return null;
+}
+
+export async function getOrFetchMovie(tmdbId: number): Promise<Movie | null> {
+  // Check cache first
+  const cached = await getMovieFromCache(tmdbId);
+  if (cached) return cached;
+
+  // Fetch fresh data with ratings
   const movie = await tmdbToMovie(tmdbId);
 
   if (!movie) return null;
 
   // Cache the result
-  await query(
-    `INSERT INTO cached_movies (tmdb_id, imdb_id, title, year, poster_url, backdrop_url, genres, synopsis, runtime, imdb_rating, rt_critic_score, rt_audience_score, rt_url, streaming_services, cached_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
-     ON CONFLICT (tmdb_id)
-     DO UPDATE SET imdb_id = $2, title = $3, year = $4, poster_url = $5, backdrop_url = $6, genres = $7, synopsis = $8, runtime = $9, imdb_rating = $10, rt_critic_score = $11, rt_audience_score = $12, rt_url = $13, streaming_services = $14, cached_at = NOW()`,
-    [
-      movie.tmdbId,
-      movie.imdbId,
-      movie.title,
-      movie.year,
-      movie.posterUrl,
-      movie.backdropUrl,
-      movie.genres,
-      movie.synopsis,
-      movie.runtime,
-      movie.imdbRating,
-      movie.rtCriticScore,
-      movie.rtAudienceScore,
-      movie.rtUrl,
-      movie.streamingServices,
-    ]
-  );
+  await cacheMovie(movie);
 
   return movie;
 }
@@ -183,11 +329,13 @@ export async function buildDeckFromFilters(
 ): Promise<Movie[]> {
   const limit = filters.limit || 20;
   const excludeIds = filters.excludeIds || new Set<number>();
-  const movies: Movie[] = [];
   let page = 1;
   const maxPages = 10; // Search more pages to find enough non-excluded movies
 
-  while (movies.length < limit && page <= maxPages) {
+  // Phase 1: Collect all candidate TMDB IDs
+  const candidateTmdbIds: number[] = [];
+
+  while (candidateTmdbIds.length < limit * 2 && page <= maxPages) {
     const { movies: tmdbMovies, totalPages } = await discoverMovies({
       genres: filters.genres,
       yearFrom: filters.yearFrom,
@@ -195,23 +343,68 @@ export async function buildDeckFromFilters(
       page,
     });
 
-    // Filter out excluded movies before fetching details
-    const candidateMovies = tmdbMovies.filter((m) => !excludeIds.has(m.id));
-
-    // Fetch full details for each movie in parallel (batch of 5)
-    for (let i = 0; i < candidateMovies.length && movies.length < limit; i += 5) {
-      const batch = candidateMovies.slice(i, i + 5);
-      const results = await Promise.all(
-        batch.map((m) => getOrFetchMovie(m.id))
-      );
-      movies.push(...results.filter((m): m is Movie => m !== null));
-    }
+    // Filter out excluded movies
+    const filtered = tmdbMovies.filter((m) => !excludeIds.has(m.id));
+    candidateTmdbIds.push(...filtered.map((m) => m.id));
 
     if (page >= totalPages) break;
     page++;
   }
 
-  return movies.slice(0, limit);
+  // Take only what we need (with some buffer for failures)
+  const tmdbIdsToFetch = candidateTmdbIds.slice(0, Math.min(limit + 10, candidateTmdbIds.length));
+
+  // Phase 2: Check cache for all candidates in parallel
+  const cacheResults = await Promise.all(
+    tmdbIdsToFetch.map(async (tmdbId) => ({
+      tmdbId,
+      cached: await getMovieFromCache(tmdbId),
+    }))
+  );
+
+  const cachedMovies: Movie[] = [];
+  const uncachedTmdbIds: number[] = [];
+
+  for (const { tmdbId, cached } of cacheResults) {
+    if (cached) {
+      cachedMovies.push(cached);
+    } else {
+      uncachedTmdbIds.push(tmdbId);
+    }
+  }
+
+  // If we have enough cached movies, return early
+  if (cachedMovies.length >= limit) {
+    return cachedMovies.slice(0, limit);
+  }
+
+  // Phase 3: Fetch basic TMDB data for uncached movies in parallel (batches of 10)
+  const basicMovies: Movie[] = [];
+  const tmdbBatchSize = 10;
+
+  for (let i = 0; i < uncachedTmdbIds.length; i += tmdbBatchSize) {
+    const batch = uncachedTmdbIds.slice(i, i + tmdbBatchSize);
+    const results = await Promise.all(batch.map((id) => tmdbToMovieBasic(id)));
+    basicMovies.push(...results.filter((m): m is Movie => m !== null));
+
+    // Check if we have enough movies now
+    if (cachedMovies.length + basicMovies.length >= limit) {
+      break;
+    }
+  }
+
+  // Phase 4: Batch enrich uncached movies with ratings
+  const enrichedMovies = await enrichMoviesWithRatingsBatch(basicMovies);
+
+  // Phase 5: Cache the enriched movies (fire and forget for speed)
+  Promise.all(enrichedMovies.map((movie) => cacheMovie(movie))).catch((error) => {
+    console.error("Failed to cache movies:", error);
+  });
+
+  // Combine cached + newly enriched movies
+  const allMovies = [...cachedMovies, ...enrichedMovies];
+
+  return allMovies.slice(0, limit);
 }
 
 export async function buildDeckFromTitles(

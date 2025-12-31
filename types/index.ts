@@ -36,6 +36,7 @@ export interface CachedMovie {
   genres: string[];
   synopsis: string;
   runtime: number | null;
+  tmdbRating: number | null; // TMDB vote_average (0-10)
   imdbRating: string | null;
   rtCriticScore: string | null;
   rtAudienceScore: string | null;
